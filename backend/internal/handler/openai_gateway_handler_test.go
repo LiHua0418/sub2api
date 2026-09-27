@@ -992,6 +992,93 @@ func TestOpenAIResponses_RejectsUnownedHTTPContinuation(t *testing.T) {
 	require.Contains(t, w.Body.String(), "previous_response_id is not available for this user")
 }
 
+type stubGatewayCacheForCacheMissTest struct {
+	sessionBindings map[string]int64
+}
+
+func (c *stubGatewayCacheForCacheMissTest) GetSessionAccountID(ctx context.Context, groupID int64, sessionHash string) (int64, error) {
+	if c.sessionBindings != nil {
+		if id, ok := c.sessionBindings[sessionHash]; ok {
+			return id, nil
+		}
+	}
+	return 0, service.ErrStickySessionNotFound
+}
+
+func (c *stubGatewayCacheForCacheMissTest) SetSessionAccountID(ctx context.Context, groupID int64, sessionHash string, accountID int64, ttl time.Duration) error {
+	if c.sessionBindings == nil {
+		c.sessionBindings = make(map[string]int64)
+	}
+	c.sessionBindings[sessionHash] = accountID
+	return nil
+}
+
+func (c *stubGatewayCacheForCacheMissTest) RefreshSessionTTL(ctx context.Context, groupID int64, sessionHash string, ttl time.Duration) error {
+	return nil
+}
+
+func (c *stubGatewayCacheForCacheMissTest) DeleteSessionAccountID(ctx context.Context, groupID int64, sessionHash string) error {
+	if c.sessionBindings != nil {
+		delete(c.sessionBindings, sessionHash)
+	}
+	return nil
+}
+
+func (c *stubGatewayCacheForCacheMissTest) SetGrokVideoPendingBilling(ctx context.Context, key string, payload []byte, ttl time.Duration) error {
+	return nil
+}
+
+func (c *stubGatewayCacheForCacheMissTest) GetGrokVideoPendingBilling(ctx context.Context, key string) ([]byte, error) {
+	return nil, nil
+}
+
+func (c *stubGatewayCacheForCacheMissTest) ClaimGrokVideoBilled(ctx context.Context, key string, ttl time.Duration) (bool, error) {
+	return true, nil
+}
+
+func (c *stubGatewayCacheForCacheMissTest) ReleaseGrokVideoBilled(ctx context.Context, key string) error {
+	return nil
+}
+
+func (c *stubGatewayCacheForCacheMissTest) SetReasoningContent(ctx context.Context, itemID string, content string, ttl time.Duration) error {
+	return nil
+}
+
+func (c *stubGatewayCacheForCacheMissTest) GetReasoningContent(ctx context.Context, itemID string) (string, error) {
+	return "", service.ErrReasoningContentNotFound
+}
+
+func TestOpenAIResponses_RecoversFromCacheMissPreviousResponseID(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/openai/v1/responses", strings.NewReader(
+		`{"model":"gpt-5.1","stream":false,"previous_response_id":"resp_migrated","input":[{"type":"input_text","text":"hello"}]}`,
+	))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	groupID := int64(2)
+	c.Set(string(middleware.ContextKeyAPIKey), &service.APIKey{
+		ID:      101,
+		GroupID: &groupID,
+		User:    &service.User{ID: 1},
+	})
+	c.Set(string(middleware.ContextKeyUser), middleware.AuthSubject{
+		UserID:      1,
+		Concurrency: 1,
+	})
+
+	h := newOpenAIHandlerForPreviousResponseIDValidation(t, nil)
+	mockCache := &stubGatewayCacheForCacheMissTest{}
+	h.gatewayService.SetGatewayCacheForTest(mockCache)
+	h.Responses(c)
+
+	// Since previous_response_id was missing from cache, it should recover by stripping previous_response_id
+	// and NOT return 400 previous_response_id is not available for this user.
+	require.NotContains(t, w.Body.String(), "previous_response_id is not available for this user")
+}
+
 func TestOpenAIResponses_FunctionCallOutputHTTPGuidanceDoesNotSuggestPreviousResponseReuse(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

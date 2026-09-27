@@ -621,9 +621,22 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 			reqLog.Warn("openai.previous_response_owner_lookup_failed", zap.Error(ownershipErr))
 		}
 		if !owned {
-			reqLog.Warn("openai.request_validation_failed", zap.String("reason", "previous_response_owner_mismatch"))
-			h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "previous_response_id is not available for this user")
-			return
+			if errors.Is(ownershipErr, service.ErrStickySessionNotFound) {
+				// Cache miss (e.g. cross-server migration, Redis restart, or cache eviction).
+				// Dynamically bind to current caller so subsequent requests recognize ownership,
+				// and strip the unresolvable previous_response_id so this request proceeds using its
+				// input context rather than killing the conversation with 400.
+				_ = h.gatewayService.BindOpenAIHTTPResponseOwner(c.Request.Context(), groupID, previousResponseID, subject.UserID, apiKey.ID)
+				body = service.RemovePreviousResponseIDFromBody(body)
+				reqLog.Info("openai.http_previous_response_id_stripped_cache_miss",
+					zap.String("previous_response_id", previousResponseID),
+				)
+				previousResponseID = ""
+			} else {
+				reqLog.Warn("openai.request_validation_failed", zap.String("reason", "previous_response_owner_mismatch"))
+				h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "previous_response_id is not available for this user")
+				return
+			}
 		}
 	}
 	service.SetOpenAIHTTPResponseOwner(c, subject.UserID, apiKey.ID)

@@ -634,6 +634,15 @@ func NewOpenAIGatewayService(
 	return svc
 }
 
+// SetGatewayCacheForTest sets cache on OpenAIGatewayService for testing.
+func (s *OpenAIGatewayService) SetGatewayCacheForTest(cache GatewayCache) {
+	if s != nil {
+		s.cache = cache
+		s.openaiWSStateStore = nil
+		s.openaiWSStateStoreOnce = sync.Once{}
+	}
+}
+
 // ResolveChannelMapping 解析渠道级模型映射（代理到 ChannelService）
 func (s *OpenAIGatewayService) ResolveChannelMapping(ctx context.Context, groupID int64, model string) ChannelMappingResult {
 	if s.channelService == nil {

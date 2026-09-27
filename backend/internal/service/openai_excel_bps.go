@@ -206,6 +206,7 @@ func (s *OpenAIGatewayService) forwardExcelBPS(ctx context.Context, c *gin.Conte
 		logger.LegacyPrintf("service.openai_excel_bps", "sanitized encrypted_content from BPS request history: account_id=%d", account.ID)
 	}
 	body, _ = normalizeExcelBPSToolChoice(body)
+	body = RemovePreviousResponseIDFromBody(body)
 	if isOpenAIResponsesCompactPath(c) {
 		var request map[string]any
 		if err = json.Unmarshal(body, &request); err != nil {
@@ -792,6 +793,7 @@ func (s *OpenAIGatewayService) forwardExcelBPSAsChatCompletions(
 		}
 	}
 	body, _ = normalizeExcelBPSToolChoice(body)
+	body = RemovePreviousResponseIDFromBody(body)
 
 	scope := fmt.Sprintf("key:%d/thread:%s", getAPIKeyIDFromContext(c), identity)
 	imageSettings, err := s.settingService.GetExcelBPSImageRelaySettings(ctx)
