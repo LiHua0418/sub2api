@@ -2,6 +2,7 @@ package service
 
 import (
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -119,6 +120,16 @@ func normalizeOpenAIResponsesRejectedFieldRetryBody(statusCode int, body, respon
 	code := strings.ToLower(strings.TrimSpace(extractUpstreamErrorCode(responseBody)))
 	message := strings.ToLower(strings.TrimSpace(extractUpstreamErrorMessage(responseBody)))
 	param := strings.ToLower(strings.TrimSpace(gjson.GetBytes(responseBody, "error.param").String()))
+	if strings.Contains(message, "must contain the word 'json'") {
+		var reqMap map[string]any
+		if err := json.Unmarshal(body, &reqMap); err == nil {
+			if ensureOpenAIResponsesJSONObjectWord(reqMap) {
+				if fixedBody, err := json.Marshal(reqMap); err == nil {
+					return fixedBody, "injected missing json word for json_object format", true, nil
+				}
+			}
+		}
+	}
 	if code == "invalid_function_parameters" &&
 		openAIResponsesToolParametersParamPattern.MatchString(param) &&
 		openAIResponsesMissingSchemaTypePattern.MatchString(message) {

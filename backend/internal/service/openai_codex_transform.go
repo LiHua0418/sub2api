@@ -348,6 +348,10 @@ func applyCodexOAuthTransformWithOptions(reqBody map[string]any, opts codexOAuth
 		result.Modified = true
 	}
 
+	if ensureOpenAIResponsesJSONObjectWord(reqBody) {
+		result.Modified = true
+	}
+
 	return result
 }
 
@@ -1906,4 +1910,108 @@ func normalizeCodexTools(reqBody map[string]any) bool {
 	}
 
 	return modified
+}
+
+func ensureOpenAIResponsesJSONObjectWord(reqBody map[string]any) bool {
+	if reqBody == nil {
+		return false
+	}
+	formatType := ""
+	if tf, ok := reqBody["text"].(map[string]any); ok {
+		if fmtMap, ok := tf["format"].(map[string]any); ok {
+			formatType = strings.TrimSpace(fmt.Sprint(fmtMap["type"]))
+		}
+	}
+	if formatType == "" {
+		if rf, ok := reqBody["response_format"].(map[string]any); ok {
+			formatType = strings.TrimSpace(fmt.Sprint(rf["type"]))
+		}
+	}
+	if !strings.EqualFold(formatType, "json_object") {
+		return false
+	}
+
+	hasJSONWord := func(v any) bool {
+		if v == nil {
+			return false
+		}
+		raw, err := json.Marshal(v)
+		if err != nil {
+			return false
+		}
+		return strings.Contains(strings.ToLower(string(raw)), "json")
+	}
+
+	if hasJSONWord(reqBody["input"]) || hasJSONWord(reqBody["messages"]) || hasJSONWord(reqBody["instructions"]) {
+		return false
+	}
+
+	const jsonHint = "Respond in JSON format."
+
+	if inputVal, ok := reqBody["input"]; ok && inputVal != nil {
+		if str, ok := inputVal.(string); ok {
+			reqBody["input"] = strings.TrimSpace(str) + "\n\n" + jsonHint
+			return true
+		}
+		if items, ok := inputVal.([]any); ok {
+			if len(items) == 0 {
+				reqBody["input"] = []any{
+					map[string]any{"type": "message", "role": "developer", "content": jsonHint},
+				}
+				return true
+			}
+			lastIdx := len(items) - 1
+			if lastMap, ok := items[lastIdx].(map[string]any); ok {
+				if contentStr, ok := lastMap["content"].(string); ok {
+					lastMap["content"] = strings.TrimSpace(contentStr) + "\n\n" + jsonHint
+					return true
+				}
+				if contentParts, ok := lastMap["content"].([]any); ok && len(contentParts) > 0 {
+					lastPartIdx := len(contentParts) - 1
+					if lastPart, ok := contentParts[lastPartIdx].(map[string]any); ok {
+						if partText, ok := lastPart["text"].(string); ok {
+							lastPart["text"] = strings.TrimSpace(partText) + "\n\n" + jsonHint
+							return true
+						}
+					}
+					lastMap["content"] = append(contentParts, map[string]any{
+						"type": "input_text",
+						"text": jsonHint,
+					})
+					return true
+				}
+			}
+			reqBody["input"] = append(items, map[string]any{
+				"type":    "message",
+				"role":    "developer",
+				"content": jsonHint,
+			})
+			return true
+		}
+	}
+
+	if msgsVal, ok := reqBody["messages"]; ok && msgsVal != nil {
+		if items, ok := msgsVal.([]any); ok {
+			if len(items) == 0 {
+				reqBody["messages"] = []any{
+					map[string]any{"role": "developer", "content": jsonHint},
+				}
+				return true
+			}
+			lastIdx := len(items) - 1
+			if lastMap, ok := items[lastIdx].(map[string]any); ok {
+				if contentStr, ok := lastMap["content"].(string); ok {
+					lastMap["content"] = strings.TrimSpace(contentStr) + "\n\n" + jsonHint
+					return true
+				}
+			}
+			reqBody["messages"] = append(items, map[string]any{
+				"role":    "developer",
+				"content": jsonHint,
+			})
+			return true
+		}
+	}
+
+	return false
 }

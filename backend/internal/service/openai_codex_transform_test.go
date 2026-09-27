@@ -2199,3 +2199,55 @@ func TestFilterCodexInput_PreservesReasoningInMixedInput(t *testing.T) {
 		})
 	}
 }
+
+func TestEnsureOpenAIResponsesJSONObjectWord(t *testing.T) {
+	t.Run("injects when missing in input string", func(t *testing.T) {
+		req := map[string]any{
+			"text": map[string]any{
+				"format": map[string]any{"type": "json_object"},
+			},
+			"input": "Extract user details",
+		}
+		modified := ensureOpenAIResponsesJSONObjectWord(req)
+		require.True(t, modified)
+		require.Contains(t, req["input"], "Respond in JSON format.")
+	})
+
+	t.Run("injects when missing in input slice", func(t *testing.T) {
+		req := map[string]any{
+			"response_format": map[string]any{"type": "json_object"},
+			"input": []any{
+				map[string]any{"role": "user", "content": "Extract user details"},
+			},
+		}
+		modified := ensureOpenAIResponsesJSONObjectWord(req)
+		require.True(t, modified)
+		items := req["input"].([]any)
+		last := items[len(items)-1].(map[string]any)
+		require.Contains(t, last["content"], "Respond in JSON format.")
+	})
+
+	t.Run("no-op when json already present in input", func(t *testing.T) {
+		req := map[string]any{
+			"text": map[string]any{
+				"format": map[string]any{"type": "json_object"},
+			},
+			"input": "Return a JSON object with user details",
+		}
+		modified := ensureOpenAIResponsesJSONObjectWord(req)
+		require.False(t, modified)
+		require.Equal(t, "Return a JSON object with user details", req["input"])
+	})
+
+	t.Run("no-op when format is not json_object", func(t *testing.T) {
+		req := map[string]any{
+			"text": map[string]any{
+				"format": map[string]any{"type": "text"},
+			},
+			"input": "Extract user details",
+		}
+		modified := ensureOpenAIResponsesJSONObjectWord(req)
+		require.False(t, modified)
+		require.Equal(t, "Extract user details", req["input"])
+	})
+}

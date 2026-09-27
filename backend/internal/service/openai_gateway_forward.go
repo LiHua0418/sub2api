@@ -480,6 +480,17 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 			logger.LegacyPrintf("service.openai_gateway", "[OpenAI] Normalized Responses JSON schema compatibility")
 		}
 	}
+	if strings.EqualFold(strings.TrimSpace(gjson.GetBytes(body, "text.format.type").String()), "json_object") ||
+		strings.EqualFold(strings.TrimSpace(gjson.GetBytes(body, "response_format.type").String()), "json_object") {
+		decoded, decodeErr := ensureReqBody()
+		if decodeErr != nil {
+			return nil, decodeErr
+		}
+		if ensureOpenAIResponsesJSONObjectWord(decoded) {
+			markDecodedModified()
+			logger.LegacyPrintf("service.openai_gateway", "[OpenAI] Injected JSON keyword into input for json_object format")
+		}
+	}
 
 	imageIntent = imageIntent || IsImageGenerationIntent(openAIResponsesEndpoint, reqModel, nil) || isOpenAIImageGenerationModel(upstreamModel)
 	if imageIntent && !imageGenerationAllowed {

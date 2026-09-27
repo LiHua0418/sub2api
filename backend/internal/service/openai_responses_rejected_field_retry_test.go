@@ -757,3 +757,14 @@ func TestNormalizeOpenAIResponsesRejectedFieldRetryBodyClearsUntypedStatusAtInde
 	require.Equal(t, "keep_a", gjson.GetBytes(retryBody, "input.0.status").String())
 	require.False(t, gjson.GetBytes(retryBody, "input.1.status").Exists())
 }
+
+func TestNormalizeOpenAIResponsesRejectedFieldRetryBodyInjectsMissingJSONWord(t *testing.T) {
+	body := []byte(`{"text":{"format":{"type":"json_object"}},"input":[{"role":"user","content":"extract user data"}]}`)
+	responseBody := []byte(`{"error":{"code":"invalid_request_error","message":"Response input messages must contain the word 'json' in some form to use 'text.format' of type 'json_object'.","param":"input"}}`)
+
+	retryBody, reason, changed, err := normalizeOpenAIResponsesRejectedFieldRetryBody(http.StatusBadRequest, body, responseBody)
+	require.NoError(t, err)
+	require.True(t, changed)
+	require.Contains(t, reason, "injected missing json word")
+	require.Contains(t, gjson.GetBytes(retryBody, "input.0.content").String(), "JSON")
+}
