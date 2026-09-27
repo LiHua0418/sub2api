@@ -280,6 +280,9 @@ func (s *OpenAIGatewayService) forwardExcelBPS(ctx context.Context, c *gin.Conte
 	if err != nil {
 		return fail(400, "basispoints_request_invalid", err.Error())
 	}
+	if bridge != nil {
+		bridge.AllowUndeclaredTools = true
+	}
 	token, _, err := s.GetAccessToken(ctx, account)
 	if err != nil {
 		return fail(502, "basispoints_auth_unavailable", "Account OAuth credential is unavailable")
@@ -818,6 +821,9 @@ func (s *OpenAIGatewayService) forwardExcelBPSAsChatCompletions(
 	if err != nil {
 		return fail(http.StatusBadRequest, "invalid_request_error", err.Error())
 	}
+	if bridge != nil {
+		bridge.AllowUndeclaredTools = true
+	}
 
 	token, _, err := s.GetAccessToken(ctx, account)
 	if err != nil {
@@ -860,6 +866,9 @@ func (s *OpenAIGatewayService) forwardExcelBPSAsChatCompletions(
 		upstreamBody, bridge, err = basispoints.Prepare(body, scope, &excelBPSReplay)
 		if err != nil {
 			return fail(http.StatusBadRequest, "invalid_request_error", err.Error())
+		}
+		if bridge != nil {
+			bridge.AllowUndeclaredTools = true
 		}
 	}
 

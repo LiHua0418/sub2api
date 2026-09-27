@@ -29,6 +29,7 @@ type Bridge struct {
 	stagedReplays    *[]replayWrite
 	hasToolHistory   bool
 	disallowParallel bool
+	AllowUndeclaredTools bool
 }
 
 func decode(raw []byte, target any) error {

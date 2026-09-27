@@ -100,3 +100,27 @@ func TestDirectCallReplaysAsTransportWrapper(t *testing.T) {
 		t.Fatal("direct-call replay is not deterministic")
 	}
 }
+
+func TestAllowUndeclaredToolsSynthesizesClientFunctionCall(t *testing.T) {
+	cache := new(ReplayCache)
+	source := testSource()
+	source["tools"] = []any{object{"type": "function", "name": "declared_tool"}}
+	_, bridge := mustPrepare(t, source, "scope", cache)
+
+	// Without AllowUndeclaredTools, undeclared tool fails
+	native := nativeCall(object{"name": "undeclared_luna_tool", "arguments": object{"action": "ping"}})
+	_, err := bridge.translateCall(native)
+	if err == nil {
+		t.Fatal("expected error for undeclared tool when AllowUndeclaredTools is false")
+	}
+
+	// With AllowUndeclaredTools, undeclared tool is synthesized as a function call
+	bridge.AllowUndeclaredTools = true
+	call, err := bridge.translateCall(native)
+	if err != nil {
+		t.Fatalf("unexpected error when AllowUndeclaredTools is true: %v", err)
+	}
+	if call["type"] != "function_call" || call["name"] != "undeclared_luna_tool" {
+		t.Fatalf("unexpected synthesized call: %+v", call)
+	}
+}

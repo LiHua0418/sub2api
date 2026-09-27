@@ -575,7 +575,14 @@ func (b *Bridge) translateCall(native object) (object, error) {
 	}
 	info, allowed := b.lookupTool(toolName)
 	if !allowed {
-		return nil, unknownClientToolError{}
+		if b.AllowUndeclaredTools {
+			info = tool{
+				Name: toolName,
+				Kind: "function",
+			}
+		} else {
+			return nil, unknownClientToolError{}
+		}
 	}
 	result, err := b.finishClientToolCall(native, info, envelope, rawCustom, !rawCmd)
 	if err != nil {
@@ -662,7 +669,15 @@ func (b *Bridge) translateDirectCatalogCall(native object) (object, error) {
 	name := text(native["name"])
 	info, ok := b.lookupTool(name)
 	if !ok {
-		return nil, fmt.Errorf("basispoints returned an unsupported native tool; no tool was executed")
+		if b.AllowUndeclaredTools {
+			info = tool{
+				Name: name,
+				Kind: "function",
+			}
+			ok = true
+		} else {
+			return nil, fmt.Errorf("basispoints returned an unsupported native tool; no tool was executed")
+		}
 	}
 	kind := text(native["type"])
 	var envelope object
