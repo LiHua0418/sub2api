@@ -14,7 +14,7 @@ func TestDirectFunctionCallRecoveredIntoClientTool(t *testing.T) {
 	source := testSource()
 	source["tools"] = []any{object{"type": "function", "name": "shell", "parameters": object{"type": "object"}}}
 	_, bridge := mustPrepare(t, source, "scope", cache)
-	for _, name := range []string{"shell", "functions.shell"} {
+	for _, name := range []string{"shell", "functions.shell", "tools.shell", "client.shell", "Shell"} {
 		native := object{"type": "function_call", "id": "fc_" + name, "call_id": "call_" + name, "name": name, "arguments": `{"command":["ls","-la"]}`}
 		call, err := bridge.translateCall(native)
 		if err != nil {

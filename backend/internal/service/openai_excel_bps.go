@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -389,6 +390,38 @@ func (s *OpenAIGatewayService) forwardExcelBPS(ctx context.Context, c *gin.Conte
 			upstreamBody = retryBody
 		}
 	}
+	if resp.StatusCode == http.StatusTooManyRequests {
+		const maxRejectionBytes = 512 << 10
+		raw, readErr := io.ReadAll(io.LimitReader(resp.Body, maxRejectionBytes+1))
+		_ = resp.Body.Close()
+		resp.Body = io.NopCloser(bytes.NewReader(raw))
+		waitDuration := extractExcelBPS429WaitDuration(raw, resp.Header)
+		if waitDuration > 0 && waitDuration <= 1500*time.Millisecond && readErr == nil && len(raw) <= maxRejectionBytes && ctx.Err() == nil {
+			retryReq, retryErr := newExcelBPSRequest(requestCtx, upstreamBody, token, accountID)
+			if retryErr == nil {
+				appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
+					Platform: account.Platform, AccountID: account.ID, AccountName: account.Name,
+					ProxyID: opsUpstreamProxyID(account), ProxyName: opsUpstreamProxyName(account),
+					UpstreamStatusCode: resp.StatusCode, UpstreamRequestID: resp.Header.Get("x-request-id"),
+					UpstreamURL: basispoints.ResponsesURL, Kind: "rate_limit_transient_retry",
+					Message: fmt.Sprintf("Excel BPS rate limited; waiting %v before retrying once on same route", waitDuration),
+				})
+				logger.LegacyPrintf("service.openai_excel_bps", "retrying transient 429 once after %v: account_id=%d", waitDuration, account.ID)
+				time.Sleep(waitDuration + 50*time.Millisecond)
+				if ctx.Err() == nil {
+					c.Set("excel_bps_upstream_attempt", c.GetInt("excel_bps_upstream_attempt")+1)
+					resp, err = s.httpUpstream.Do(retryReq, proxyURL, account.ID, account.Concurrency)
+					SetOpsLatencyMs(c, OpsUpstreamLatencyMsKey, time.Since(sent).Milliseconds())
+					if err != nil {
+						if lease != nil && ctx.Err() == nil {
+							lease.ReportFailure()
+						}
+						return fail(502, "basispoints_transport_error", "Excel BPS retry connection failed; request was not replayed again")
+					}
+				}
+			}
+		}
+	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		if lease != nil && resp.StatusCode >= 500 && ctx.Err() == nil {
 			lease.ReportUpstreamFailure()
@@ -399,6 +432,10 @@ func (s *OpenAIGatewayService) forwardExcelBPS(ctx context.Context, c *gin.Conte
 		// Preserve the original rejection for Ops without exposing it to clients.
 		// BPS errors can echo request fields, so redact before storing diagnostics.
 		upstreamMessage := fmt.Sprintf("Excel BPS returned HTTP %d", resp.StatusCode)
+		upstreamErr := ""
+		if message := strings.TrimSpace(extractUpstreamErrorMessage(raw)); message != "" {
+			upstreamErr = truncateString(message, 512)
+		}
 		upstreamDetail := ""
 		if s.cfg != nil && s.cfg.Gateway.LogUpstreamErrorBody {
 			safeBody := excelBPSSanitizeErrorBody(string(raw), token, account)
@@ -409,8 +446,10 @@ func (s *OpenAIGatewayService) forwardExcelBPS(ctx context.Context, c *gin.Conte
 			upstreamDetail, _ = sanitizeErrorBodyForStorage(safeBody, maxBytes)
 			if message := strings.TrimSpace(extractUpstreamErrorMessage([]byte(safeBody))); message != "" {
 				upstreamMessage = truncateString(message, 2048)
+				upstreamErr = truncateString(message, 512)
 			}
 		}
+		logger.LegacyPrintf("service.openai_excel_bps", "upstream rejected: status=%d account_id=%d msg=%s", resp.StatusCode, account.ID, upstreamErr)
 		setOpsUpstreamError(c, resp.StatusCode, upstreamMessage, upstreamDetail)
 		appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
 			Platform: account.Platform, AccountID: account.ID, AccountName: account.Name,
@@ -428,6 +467,9 @@ func (s *OpenAIGatewayService) forwardExcelBPS(ctx context.Context, c *gin.Conte
 			return fail(resp.StatusCode, code, "This model is not available on the account's Excel BPS endpoint")
 		}
 		message := "Excel BPS rejected this request; account scheduling was not changed"
+		if upstreamErr != "" && !strings.HasPrefix(upstreamErr, "Excel BPS returned HTTP") {
+			message = fmt.Sprintf("Excel BPS rejected this request (%s); account scheduling was not changed", upstreamErr)
+		}
 		errorCode := "basispoints_upstream_error"
 		if resp.StatusCode == http.StatusBadRequest && isExcelBPSInvalidEncryptedContent(raw) {
 			errorCode = "invalid_encrypted_content"
@@ -841,15 +883,35 @@ func (s *OpenAIGatewayService) forwardExcelBPSAsChatCompletions(
 	}
 	defer func() { _ = resp.Body.Close() }()
 
+	if resp.StatusCode == http.StatusTooManyRequests {
+		const maxRejectionBytes = 512 << 10
+		raw, readErr := io.ReadAll(io.LimitReader(resp.Body, maxRejectionBytes+1))
+		_ = resp.Body.Close()
+		resp.Body = io.NopCloser(bytes.NewReader(raw))
+		waitDuration := extractExcelBPS429WaitDuration(raw, resp.Header)
+		if waitDuration > 0 && waitDuration <= 1500*time.Millisecond && readErr == nil && len(raw) <= maxRejectionBytes && ctx.Err() == nil {
+			retryReq, retryErr := newExcelBPSRequest(requestCtx, upstreamBody, token, accountID)
+			if retryErr == nil {
+				logger.LegacyPrintf("service.openai_excel_bps", "chat_completions retrying transient 429 once after %v: account_id=%d", waitDuration, account.ID)
+				time.Sleep(waitDuration + 50*time.Millisecond)
+				if ctx.Err() == nil {
+					resp, err = s.httpUpstream.Do(retryReq, proxyURL, account.ID, account.Concurrency)
+					SetOpsLatencyMs(c, OpsUpstreamLatencyMsKey, time.Since(sent).Milliseconds())
+					if err != nil {
+						return fail(http.StatusBadGateway, "api_error", "Excel BPS recovery connection failed; request was not replayed again")
+					}
+				}
+			}
+		}
+	}
+
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		raw, _ := io.ReadAll(io.LimitReader(resp.Body, 512<<10))
-		logger.LegacyPrintf("service.openai_excel_bps", "upstream HTTP %d: account_id=%d body=%s", resp.StatusCode, account.ID, string(raw))
-		if resp.StatusCode == http.StatusTooManyRequests && s.rateLimitService != nil {
-			stateCtx, cancel := openAIAccountStateContext(ctx)
-			s.rateLimitService.handle429Cooldown(stateCtx, account, resp.Header, raw)
-			cancel()
-		}
 		upstreamMessage := fmt.Sprintf("Excel BPS returned HTTP %d", resp.StatusCode)
+		upstreamErr := ""
+		if message := strings.TrimSpace(extractUpstreamErrorMessage(raw)); message != "" {
+			upstreamErr = truncateString(message, 512)
+		}
 		upstreamDetail := ""
 		if s.cfg != nil && s.cfg.Gateway.LogUpstreamErrorBody {
 			safeBody := excelBPSSanitizeErrorBody(string(raw), token, account)
@@ -860,7 +922,14 @@ func (s *OpenAIGatewayService) forwardExcelBPSAsChatCompletions(
 			upstreamDetail, _ = sanitizeErrorBodyForStorage(safeBody, maxBytes)
 			if message := strings.TrimSpace(extractUpstreamErrorMessage([]byte(safeBody))); message != "" {
 				upstreamMessage = truncateString(message, 2048)
+				upstreamErr = truncateString(message, 512)
 			}
+		}
+		logger.LegacyPrintf("service.openai_excel_bps", "upstream HTTP %d: account_id=%d msg=%s", resp.StatusCode, account.ID, upstreamErr)
+		if resp.StatusCode == http.StatusTooManyRequests && s.rateLimitService != nil {
+			stateCtx, cancel := openAIAccountStateContext(ctx)
+			s.rateLimitService.handle429Cooldown(stateCtx, account, resp.Header, raw)
+			cancel()
 		}
 		setOpsUpstreamError(c, resp.StatusCode, upstreamMessage, upstreamDetail)
 		appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
@@ -875,6 +944,9 @@ func (s *OpenAIGatewayService) forwardExcelBPSAsChatCompletions(
 			return fail(resp.StatusCode, code, "This model is not available on the account's Excel BPS endpoint")
 		}
 		message := "Excel BPS rejected this request; account scheduling was not changed"
+		if upstreamErr != "" && !strings.HasPrefix(upstreamErr, "Excel BPS returned HTTP") {
+			message = fmt.Sprintf("Excel BPS rejected this request (%s); account scheduling was not changed", upstreamErr)
+		}
 		if resp.StatusCode == http.StatusTooManyRequests {
 			message = "Excel BPS rate limit exceeded; request was not replayed"
 		}
@@ -939,4 +1011,34 @@ func (s *OpenAIGatewayService) forwardExcelBPSAsChatCompletions(
 		result.RequestedReasoningEffort = requestedEffort
 	}
 	return result, handleErr
+}
+
+var (
+	reExcelBPSWaitMS = regexp.MustCompile(`(?i)try again in\s+(\d+(?:\.\d+)?)\s*ms`)
+	reExcelBPSWaitS  = regexp.MustCompile(`(?i)try again in\s+(\d+(?:\.\d+)?)\s*s`)
+)
+
+func extractExcelBPS429WaitDuration(raw []byte, header http.Header) time.Duration {
+	if header != nil {
+		if retryAfter := strings.TrimSpace(header.Get("Retry-After")); retryAfter != "" {
+			if seconds, err := strconv.Atoi(retryAfter); err == nil && seconds > 0 {
+				return time.Duration(seconds) * time.Second
+			}
+		}
+	}
+	if len(raw) == 0 {
+		return 0
+	}
+	msg := string(raw)
+	if m := reExcelBPSWaitMS.FindStringSubmatch(msg); len(m) > 1 {
+		if ms, err := strconv.ParseFloat(m[1], 64); err == nil && ms > 0 {
+			return time.Duration(ms * float64(time.Millisecond))
+		}
+	}
+	if m := reExcelBPSWaitS.FindStringSubmatch(msg); len(m) > 1 {
+		if s, err := strconv.ParseFloat(m[1], 64); err == nil && s > 0 {
+			return time.Duration(s * float64(time.Second))
+		}
+	}
+	return 0
 }

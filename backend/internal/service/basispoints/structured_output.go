@@ -140,13 +140,55 @@ func (s *structuredOutput) validate(response object) error {
 		return nil
 	}
 	var instance any
-	if err := decode([]byte(answer.String()), &instance); err != nil {
+	if cleaned, parsed, ok := cleanStructuredJSON(answer.String()); ok {
+		instance = parsed
+		if cleaned != answer.String() {
+			for _, raw := range output {
+				item, _ := raw.(object)
+				if text(item["type"]) != "message" {
+					continue
+				}
+				content, _ := item["content"].([]any)
+				for _, rawPart := range content {
+					part, _ := rawPart.(object)
+					if text(part["type"]) == "output_text" {
+						part["text"] = cleaned
+						break
+					}
+				}
+			}
+		}
+	} else {
 		return fmt.Errorf("basispoints structured output is not one valid JSON value")
 	}
 	if s.schema != nil && s.schema.Validate(instance) != nil {
 		return fmt.Errorf("basispoints structured output does not satisfy the requested JSON schema")
 	}
 	return nil
+}
+
+func cleanStructuredJSON(raw string) (string, any, bool) {
+	trimmed := strings.TrimSpace(raw)
+	var instance any
+	if decode([]byte(trimmed), &instance) == nil {
+		return trimmed, instance, true
+	}
+
+	// Strip Markdown code fences: ```json\n...\n``` or ```\n...\n```
+	if strings.HasPrefix(trimmed, "```") {
+		s := trimmed
+		if newlineIdx := strings.Index(s, "\n"); newlineIdx != -1 {
+			s = strings.TrimSpace(s[newlineIdx+1:])
+		}
+		if strings.HasSuffix(s, "```") {
+			s = strings.TrimSpace(strings.TrimSuffix(s, "```"))
+		}
+		if decode([]byte(s), &instance) == nil {
+			return s, instance, true
+		}
+	}
+
+	return "", nil, false
 }
 
 func isStructuredMessageEvent(kind string, item object) bool {

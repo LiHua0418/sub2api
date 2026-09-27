@@ -573,7 +573,7 @@ func (b *Bridge) translateCall(native object) (object, error) {
 	if err != nil {
 		return nil, err
 	}
-	info, allowed := b.tools[toolName]
+	info, allowed := b.lookupTool(toolName)
 	if !allowed {
 		return nil, unknownClientToolError{}
 	}
@@ -586,6 +586,54 @@ func (b *Bridge) translateCall(native object) (object, error) {
 	return result, nil
 }
 
+// lookupTool performs an exact and resilient fuzzy lookup for declared tools,
+// matching common model-generated prefixes (functions., tools., client.) and
+// case variations.
+func (b *Bridge) lookupTool(name string) (tool, bool) {
+	if len(b.tools) == 0 {
+		return tool{}, false
+	}
+	// 1. Exact match
+	if info, ok := b.tools[name]; ok {
+		return info, true
+	}
+	// 2. Common prefix stripping: functions., tools., client.
+	for _, prefix := range []string{"functions.", "tools.", "client."} {
+		if strings.HasPrefix(name, prefix) {
+			trimmed := strings.TrimPrefix(name, prefix)
+			if info, ok := b.tools[trimmed]; ok {
+				return info, true
+			}
+		}
+	}
+	// 3. Namespace dot suffix: e.g. "my_namespace.tool_name" -> "tool_name"
+	if dot := strings.LastIndexByte(name, '.'); dot != -1 && dot < len(name)-1 {
+		suffix := name[dot+1:]
+		if info, ok := b.tools[suffix]; ok {
+			return info, true
+		}
+	}
+	// 4. Case-insensitive match
+	lower := strings.ToLower(name)
+	for k, info := range b.tools {
+		if strings.ToLower(k) == lower {
+			return info, true
+		}
+	}
+	// 5. Case-insensitive match after prefix stripping
+	for _, prefix := range []string{"functions.", "tools.", "client."} {
+		if strings.HasPrefix(lower, prefix) {
+			trimmed := strings.TrimPrefix(lower, prefix)
+			for k, info := range b.tools {
+				if strings.ToLower(k) == trimmed {
+					return info, true
+				}
+			}
+		}
+	}
+	return tool{}, false
+}
+
 // translateDirectCatalogCall recovers a native tool call the model addressed by the
 // client tool's own name instead of through the run_officejs transport. Some turns
 // skip the wrapper and call the catalog tool directly; the reference plugins accept
@@ -595,12 +643,7 @@ func (b *Bridge) translateCall(native object) (object, error) {
 // native tool remains an unsupported-native-tool error.
 func (b *Bridge) translateDirectCatalogCall(native object) (object, error) {
 	name := text(native["name"])
-	info, ok := b.tools[name]
-	if !ok {
-		if trimmed := strings.TrimPrefix(name, "functions."); trimmed != name {
-			info, ok = b.tools[trimmed]
-		}
-	}
+	info, ok := b.lookupTool(name)
 	if !ok {
 		return nil, fmt.Errorf("basispoints returned an unsupported native tool; no tool was executed")
 	}
