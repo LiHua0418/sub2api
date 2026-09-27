@@ -468,7 +468,9 @@ func (b *Bridge) translateHistory(input []any) ([]any, error) {
 		case "configuration_update":
 			return nil, fmt.Errorf("basispoints does not support configuration_update; start a new request with the desired effort")
 		}
-		if (text(item["type"]) == "message" && text(item["role"]) == "assistant") || text(item["type"]) == "assistant" {
+		role := text(item["role"])
+		itemType := text(item["type"])
+		if role == "assistant" || role == "model" || itemType == "assistant" || (itemType == "message" && role != "user") || (role == "" && itemType == "") {
 			if content, ok := item["content"].([]any); ok {
 				var cleanContent []any
 				for _, p := range content {
@@ -477,7 +479,14 @@ func (b *Bridge) translateHistory(input []any) ([]any, error) {
 						part, _ = p.(map[string]any)
 					}
 					if part != nil && text(part["type"]) == "encrypted_content" {
-						if enc := text(part["encrypted_content"]); enc != "" {
+						enc := text(part["encrypted_content"])
+						if enc == "" {
+							enc = text(part["data"])
+						}
+						if enc == "" {
+							enc = text(part["content"])
+						}
+						if enc != "" {
 							result = append(result, object{"type": "reasoning", "summary": []any{}, "encrypted_content": enc})
 						}
 					} else {

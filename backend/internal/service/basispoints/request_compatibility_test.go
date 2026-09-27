@@ -39,3 +39,76 @@ func TestTurnWithoutUserRemainsStableAcrossToolResults(t *testing.T) {
 		t.Fatalf("unstable continuation metadata: %v / %v", a, b)
 	}
 }
+
+func TestAssistantEncryptedContentInHistoryIsCleanedAndLifted(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		item object
+	}{
+		{
+			name: "typed message assistant",
+			item: object{
+				"type": "message",
+				"role": "assistant",
+				"content": []any{
+					object{"type": "output_text", "text": "previous reply"},
+					object{"type": "encrypted_content", "encrypted_content": "gAAAAABencryptedBlob"},
+				},
+			},
+		},
+		{
+			name: "untyped assistant with role only",
+			item: object{
+				"role": "assistant",
+				"content": []any{
+					object{"type": "output_text", "text": "previous reply without type"},
+					object{"type": "encrypted_content", "encrypted_content": "gAAAAABencryptedBlob"},
+				},
+			},
+		},
+		{
+			name: "assistant with data field in encrypted content",
+			item: object{
+				"role": "assistant",
+				"content": []any{
+					object{"type": "output_text", "text": "previous reply with data"},
+					object{"type": "encrypted_content", "data": "gAAAAABencryptedBlob"},
+				},
+			},
+		},
+		{
+			name: "assistant with empty encrypted content",
+			item: object{
+				"role": "assistant",
+				"content": []any{
+					object{"type": "output_text", "text": "previous reply with empty enc"},
+					object{"type": "encrypted_content"},
+				},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			source := testSource()
+			source["input"] = []any{
+				message("user", "first question"),
+				tc.item,
+				message("user", "second question"),
+			}
+			raw, err := json.Marshal(source)
+			if err != nil {
+				t.Fatal(err)
+			}
+			out, bridge, err := Prepare(raw, "scope", nil)
+			if err != nil {
+				t.Fatalf("Prepare must succeed and strip encrypted_content from assistant history: %v", err)
+			}
+			if bridge == nil {
+				t.Fatal("expected non-nil bridge")
+			}
+			outJSON, _ := json.Marshal(out)
+			if strings.Contains(string(outJSON), "type=encrypted_content") || strings.Contains(string(outJSON), "\"type\":\"encrypted_content\"") {
+				t.Fatalf("prepared wire request must not contain encrypted_content part in message content: %s", string(outJSON))
+			}
+		})
+	}
+}
