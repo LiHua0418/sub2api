@@ -44,6 +44,8 @@ export default {
           capacityHint: 'Request admission limits cover OpenAI/Composite Responses, Chat and Messages HTTP requests, including text-only requests. Larger requests allow less concurrency; excess requests receive 503 without being queued in memory. Raising the budget increases memory pressure.',
           invalidBaseUrl: 'Enter a valid HTTPS origin without a path, credentials, query or fragment.',
           invalidCapacity: 'Set a body limit of 1–128 MiB, a shared budget of 512–2048 MiB at least eight times the body limit, and 1–512 in-flight requests.',
+          cacheCreationAsInput: 'Bill cache creation as regular input',
+          cacheCreationAsInputHint: 'When enabled, global Excel / BPS cache creation (write) tokens are counted as regular input and billed at input price, and reported downstream cache creation usage is zeroed out.',
         },
         channelMonitor: {
           title: 'Channel Monitor',

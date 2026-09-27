@@ -466,7 +466,20 @@ func (b *Bridge) translateHistory(input []any) ([]any, error) {
 			item["id"] = itemID
 			toolImages = separateToolImages(item)
 		case "configuration_update":
-			return nil, fmt.Errorf("basispoints does not support configuration_update; start a new request with the desired effort")
+			if r, ok := item["reasoning"].(object); ok {
+				if eff := text(r["effort"]); eff != "" {
+					if normalized, err := NormalizeEffort(eff); err == nil {
+						b.RequestedEffort = eff
+						b.Effort = normalized
+					}
+				}
+			} else if eff := text(item["reasoning_effort"]); eff != "" {
+				if normalized, err := NormalizeEffort(eff); err == nil {
+					b.RequestedEffort = eff
+					b.Effort = normalized
+				}
+			}
+			continue
 		}
 		role := text(item["role"])
 		itemType := text(item["type"])

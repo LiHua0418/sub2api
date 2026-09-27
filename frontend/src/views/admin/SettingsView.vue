@@ -7479,6 +7479,17 @@
                 </p>
               </template>
             </div>
+            <div class="flex items-center justify-between gap-4 pt-4 border-t border-gray-100 dark:border-dark-700">
+              <div>
+                <label for="excel-bps-cache-creation-as-input" class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {{ t('admin.settings.features.excelBpsImages.cacheCreationAsInput') }}
+                </label>
+                <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                  {{ t('admin.settings.features.excelBpsImages.cacheCreationAsInputHint') }}
+                </p>
+              </div>
+              <Toggle id="excel-bps-cache-creation-as-input" v-model="form.excel_bps_cache_creation_as_input" />
+            </div>
           </div>
         </div>
 
@@ -10055,6 +10066,7 @@ type SettingsForm = Omit<
   | "openai_oauth_scheduling_rate_multiplier"
 > & {
   openai_codex_ticket_harvest_scope: { mode: "all" | "selected"; group_ids: number[]; account_policy: "schedulable_only" | "prioritize_schedulable" };
+  excel_bps_cache_creation_as_input: boolean;
   /** Form always binds a concrete boolean (SystemSettings marks this optional). */
   channel_monitor_hide_throughput: boolean;
   channel_monitor_show_quota: boolean;
@@ -10424,6 +10436,7 @@ const form = reactive<SettingsForm>({
   excel_bps_image_storage_mib: 1024,
   excel_bps_image_storage_entries: 512,
   excel_bps_image_ttl_minutes: 30,
+  excel_bps_cache_creation_as_input: false,
 });
 
 // 人机验证 UI 状态：单卡片「总开关 + 服务商单选」，落库仍是三个独立
@@ -12272,6 +12285,7 @@ async function saveSettings() {
       excel_bps_image_storage_mib: form.excel_bps_image_storage_mib,
       excel_bps_image_storage_entries: form.excel_bps_image_storage_entries,
       excel_bps_image_ttl_minutes: form.excel_bps_image_ttl_minutes,
+      excel_bps_cache_creation_as_input: form.excel_bps_cache_creation_as_input,
     };
 
     // 仅当 openai_fast_policy_settings 已成功从后端加载时才回写，

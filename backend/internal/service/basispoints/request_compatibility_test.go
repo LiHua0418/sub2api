@@ -112,3 +112,27 @@ func TestAssistantEncryptedContentInHistoryIsCleanedAndLifted(t *testing.T) {
 		})
 	}
 }
+
+func TestConfigurationUpdateInHistoryIsSupported(t *testing.T) {
+	source := testSource()
+	source["input"] = []any{
+		message("user", "first message"),
+		object{"type": "configuration_update", "reasoning": object{"effort": "high"}},
+		message("user", "second message"),
+	}
+	raw, err := json.Marshal(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, bridge, err := Prepare(raw, "scope", nil)
+	if err != nil {
+		t.Fatalf("Prepare must succeed when configuration_update is present: %v", err)
+	}
+	if bridge.Effort != "high" {
+		t.Fatalf("bridge effort must update to high, got %q", bridge.Effort)
+	}
+	outJSON, _ := json.Marshal(out)
+	if strings.Contains(string(outJSON), "configuration_update") {
+		t.Fatal("prepared wire request must not forward configuration_update to BPS upstream")
+	}
+}

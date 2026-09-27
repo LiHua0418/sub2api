@@ -790,6 +790,7 @@ export interface SystemSettings {
   excel_bps_image_storage_mib: number;
   excel_bps_image_storage_entries: number;
   excel_bps_image_ttl_minutes: number;
+  excel_bps_cache_creation_as_input?: boolean;
 }
 
 export interface UpdateSettingsRequest {
@@ -1126,6 +1127,7 @@ export interface UpdateSettingsRequest {
   excel_bps_image_storage_mib?: number;
   excel_bps_image_storage_entries?: number;
   excel_bps_image_ttl_minutes?: number;
+  excel_bps_cache_creation_as_input?: boolean;
 }
 
 /**

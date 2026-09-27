@@ -425,6 +425,7 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		ExcelBPSImageStorageMiB:     settings.ExcelBPSImageStorageMiB,
 		ExcelBPSImageStorageEntries: settings.ExcelBPSImageStorageEntries,
 		ExcelBPSImageTTLMinutes:     settings.ExcelBPSImageTTLMinutes,
+		ExcelBPSCacheCreationAsInput: settings.ExcelBPSCacheCreationAsInput,
 	}
 
 	// OpenAI fast policy (stored under a dedicated setting key)

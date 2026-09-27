@@ -415,6 +415,7 @@ type UpdateSettingsRequest struct {
 	ExcelBPSImageStorageMiB     *int    `json:"excel_bps_image_storage_mib"`
 	ExcelBPSImageStorageEntries *int    `json:"excel_bps_image_storage_entries"`
 	ExcelBPSImageTTLMinutes     *int    `json:"excel_bps_image_ttl_minutes"`
+	ExcelBPSCacheCreationAsInput *bool  `json:"excel_bps_cache_creation_as_input"`
 }
 
 // UpdateSettings 更新系统设置
@@ -1830,6 +1831,12 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 			}
 			return previousSettings.ExcelBPSImageMaxRequests
 		}(),
+		ExcelBPSCacheCreationAsInput: func() bool {
+			if req.ExcelBPSCacheCreationAsInput != nil {
+				return *req.ExcelBPSCacheCreationAsInput
+			}
+			return previousSettings.ExcelBPSCacheCreationAsInput
+		}(),
 		AllowUserViewErrorRequests: func() bool {
 			if req.AllowUserViewErrorRequests != nil {
 				return *req.AllowUserViewErrorRequests
@@ -2704,6 +2711,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		ExcelBPSImageBodyLimitMiB: updatedSettings.ExcelBPSImageBodyLimitMiB,
 		ExcelBPSImageBudgetMiB:    updatedSettings.ExcelBPSImageBudgetMiB,
 		ExcelBPSImageMaxRequests:  updatedSettings.ExcelBPSImageMaxRequests,
+		ExcelBPSCacheCreationAsInput: updatedSettings.ExcelBPSCacheCreationAsInput,
 	}
 	if fastPolicy, err := h.settingService.GetOpenAIFastPolicySettings(c.Request.Context()); err != nil {
 		slog.Error("openai_fast_policy_settings_get_failed", "error", err)

@@ -382,6 +382,7 @@ type SystemSettings struct {
 	ExcelBPSImageStorageMiB     int    `json:"excel_bps_image_storage_mib"`
 	ExcelBPSImageStorageEntries int    `json:"excel_bps_image_storage_entries"`
 	ExcelBPSImageTTLMinutes     int    `json:"excel_bps_image_ttl_minutes"`
+	ExcelBPSCacheCreationAsInput bool  `json:"excel_bps_cache_creation_as_input"`
 }
 
 type DefaultSubscriptionSetting struct {

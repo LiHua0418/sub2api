@@ -104,6 +104,7 @@ func sanitizeExcelBPSEncryptedContent(body []byte) ([]byte, bool, error) {
 		return body, false, nil
 	}
 	changed := false
+	lastConfiguredEffort := ""
 	newInput := make([]any, 0, len(inputList))
 	for _, rawItem := range inputList {
 		item, ok := rawItem.(map[string]any)
@@ -111,8 +112,22 @@ func sanitizeExcelBPSEncryptedContent(body []byte) ([]byte, bool, error) {
 			newInput = append(newInput, rawItem)
 			continue
 		}
-		role, _ := item["role"].(string)
 		itemType, _ := item["type"].(string)
+		if itemType == "configuration_update" {
+			changed = true
+			effort := ""
+			if rMap, ok := item["reasoning"].(map[string]any); ok {
+				effort, _ = rMap["effort"].(string)
+			}
+			if effort == "" {
+				effort, _ = item["reasoning_effort"].(string)
+			}
+			if effort != "" {
+				lastConfiguredEffort = effort
+			}
+			continue
+		}
+		role, _ := item["role"].(string)
 		isAssistant := role == "assistant" || role == "model" || itemType == "assistant"
 
 		for _, field := range []string{"content", "output"} {
@@ -172,6 +187,14 @@ func sanitizeExcelBPSEncryptedContent(body []byte) ([]byte, bool, error) {
 	}
 	if !changed {
 		return body, false, nil
+	}
+	if lastConfiguredEffort != "" {
+		decoded["reasoning_effort"] = lastConfiguredEffort
+		if rMap, ok := decoded["reasoning"].(map[string]any); ok {
+			rMap["effort"] = lastConfiguredEffort
+		} else {
+			decoded["reasoning"] = map[string]any{"effort": lastConfiguredEffort}
+		}
 	}
 	decoded["input"] = newInput
 	out, err := marshalOpenAIUpstreamJSON(decoded)

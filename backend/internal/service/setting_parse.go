@@ -289,6 +289,7 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		SettingKeyExcelBPSImageStorageMiB:     "1024",
 		SettingKeyExcelBPSImageStorageEntries: "512",
 		SettingKeyExcelBPSImageTTLMinutes:     "30",
+		SettingKeyExcelBPSCacheCreationAsInput: "false",
 	}
 
 	return s.settingRepo.SetMultiple(ctx, defaults)
@@ -1085,6 +1086,7 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 	result.ExcelBPSImageStorageMiB = imageLimits.StorageMiB
 	result.ExcelBPSImageStorageEntries = imageLimits.StorageEntries
 	result.ExcelBPSImageTTLMinutes = imageLimits.TTLMinutes
+	result.ExcelBPSCacheCreationAsInput = settings[SettingKeyExcelBPSCacheCreationAsInput] == "true"
 
 	// Publish Grok default model_mapping options for accounts with empty mapping.
 	xai.SetRuntimeModelMappingOptions(xai.ModelMappingOptions{

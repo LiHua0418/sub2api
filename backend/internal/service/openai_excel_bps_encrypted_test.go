@@ -54,6 +54,23 @@ func TestSanitizeExcelBPSEncryptedContent(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, changed)
 	require.Equal(t, cleanBody, sameBody)
+
+	// Case 3: Body with configuration_update in input history
+	configBody := []byte(`{
+		"model": "gpt-5.6-sol",
+		"reasoning": {"effort": "low"},
+		"input": [
+			{"role": "user", "content": [{"type": "input_text", "text": "start"}]},
+			{"type": "configuration_update", "reasoning": {"effort": "high"}},
+			{"role": "user", "content": [{"type": "input_text", "text": "next question"}]}
+		]
+	}`)
+	sanitizedConfig, changed, err := sanitizeExcelBPSEncryptedContent(configBody)
+	require.NoError(t, err)
+	require.True(t, changed)
+	require.False(t, strings.Contains(string(sanitizedConfig), "configuration_update"))
+	require.True(t, strings.Contains(string(sanitizedConfig), `"effort":"high"`))
+	require.True(t, strings.Contains(string(sanitizedConfig), `"reasoning_effort":"high"`))
 }
 
 func TestExcelBPSInvalidEncryptedContentClassification(t *testing.T) {

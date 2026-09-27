@@ -44,6 +44,8 @@ export default {
           capacityHint: '请求接入限制覆盖 OpenAI/Composite 的 Responses、Chat 和 Messages HTTP 请求, 包括纯文本. 大请求可用并发更低; 超额返回 503, 不在内存中排队. 提高预算会增加内存压力.',
           invalidBaseUrl: '请填写有效的 HTTPS 访问地址, 不包含路径, 账号密码, 查询参数或片段.',
           invalidCapacity: '请求体上限须为 1–128 MiB, 共享预算为 512–2048 MiB 且至少为请求体的 8 倍, 在途请求数为 1–512.',
+          cacheCreationAsInput: '创建缓存按普通输入计费',
+          cacheCreationAsInputHint: '默认关闭。勾选后，全局 Excel / BPS 缓存创建（写入）token 计入普通输入并按输入价格计费，返回下游的缓存创建用量同步归零。',
         },
         channelMonitor: {
           title: '渠道监控',
