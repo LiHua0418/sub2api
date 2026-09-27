@@ -519,7 +519,14 @@ func (s *OpenAIGatewayService) forwardExcelBPS(ctx context.Context, c *gin.Conte
 	}
 	scanner := newOpenAISSEReadPump(converted, 16<<20)
 	defer scanner.Close()
-	heartbeat := time.NewTicker(15 * time.Second)
+	keepaliveInterval := 5 * time.Second
+	if s.cfg != nil && s.cfg.Gateway.StreamKeepaliveInterval > 0 {
+		keepaliveInterval = time.Duration(s.cfg.Gateway.StreamKeepaliveInterval) * time.Second
+		if keepaliveInterval > 5*time.Second {
+			keepaliveInterval = 5 * time.Second
+		}
+	}
+	heartbeat := time.NewTicker(keepaliveInterval)
 	defer heartbeat.Stop()
 	keepalive := func() {
 		if stream && ctx.Err() == nil {
