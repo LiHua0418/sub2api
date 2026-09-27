@@ -86,7 +86,9 @@ func (b *Bridge) translateCompleted(ctx context.Context, response object, repair
 	for _, item := range original {
 		if target := transportTarget(transportArguments(item)); target != "" {
 			if _, allowed := b.lookupTool(target); !allowed {
-				return validation
+				if !b.AllowUndeclaredTools {
+					return validation
+				}
 			}
 		}
 	}
@@ -223,6 +225,12 @@ func (b *Bridge) preservesToolOperations(original, corrected []object) bool {
 		args := transportArguments(native)
 		if target := transportTarget(args); target != "" {
 			info, allowed := b.lookupTool(target)
+			if !allowed {
+				if b.AllowUndeclaredTools {
+					info = tool{Name: target, Kind: "function"}
+					allowed = true
+				}
+			}
 			if !allowed || after["name"] != info.Name || text(after["namespace"]) != info.Namespace {
 				return false
 			}

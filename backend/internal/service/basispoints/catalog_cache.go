@@ -192,5 +192,9 @@ func (b *Bridge) Reprepare(raw []byte) ([]byte, *Bridge, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	return prepare(encoded, b.scope, b.replay, b.nativeToolImages)
+	body, nextBridge, err := prepare(encoded, b.scope, b.replay, b.nativeToolImages)
+	if err == nil && nextBridge != nil {
+		nextBridge.AllowUndeclaredTools = b.AllowUndeclaredTools
+	}
+	return body, nextBridge, err
 }

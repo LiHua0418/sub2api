@@ -338,6 +338,9 @@ func (s *OpenAIGatewayService) forwardExcelBPS(ctx context.Context, c *gin.Conte
 		if err != nil {
 			return fail(400, "basispoints_request_invalid", err.Error())
 		}
+		if bridge != nil {
+			bridge.AllowUndeclaredTools = true
+		}
 	}
 	requestCtx := WithHTTPUpstreamRedirectsDisabled(WithHTTPUpstreamProfile(ctx, HTTPUpstreamProfileLongStream))
 
