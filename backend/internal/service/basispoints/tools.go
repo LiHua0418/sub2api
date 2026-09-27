@@ -468,6 +468,25 @@ func (b *Bridge) translateHistory(input []any) ([]any, error) {
 		case "configuration_update":
 			return nil, fmt.Errorf("basispoints does not support configuration_update; start a new request with the desired effort")
 		}
+		if (text(item["type"]) == "message" && text(item["role"]) == "assistant") || text(item["type"]) == "assistant" {
+			if content, ok := item["content"].([]any); ok {
+				var cleanContent []any
+				for _, p := range content {
+					part, _ := p.(object)
+					if part == nil {
+						part, _ = p.(map[string]any)
+					}
+					if part != nil && text(part["type"]) == "encrypted_content" {
+						if enc := text(part["encrypted_content"]); enc != "" {
+							result = append(result, object{"type": "reasoning", "summary": []any{}, "encrypted_content": enc})
+						}
+					} else {
+						cleanContent = append(cleanContent, p)
+					}
+				}
+				item["content"] = cleanContent
+			}
+		}
 		if err := b.validateHistoryContent(item["content"], index, "content"); err != nil {
 			return nil, err
 		}

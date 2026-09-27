@@ -25,6 +25,7 @@ const (
 	SettingKeyExcelBPSImageStorageMiB     = "excel_bps_image_storage_mib"
 	SettingKeyExcelBPSImageStorageEntries = "excel_bps_image_storage_entries"
 	SettingKeyExcelBPSImageTTLMinutes     = "excel_bps_image_ttl_minutes"
+	SettingKeyExcelBPSCacheCreationAsInput = "excel_bps_cache_creation_as_input"
 
 	DefaultExcelBPSImageBodyLimitMiB = 64
 	DefaultExcelBPSImageBudgetMiB    = 1024
@@ -152,6 +153,21 @@ func parseExcelBPSImageLimits(values map[string]string) (basispoints.ImageRelayL
 		return limits, err
 	}
 	return limits, limits.Validate()
+}
+
+// IsExcelBPSCacheCreationAsInputEnabled checks whether the global setting to treat
+// Excel BPS cache creation/write tokens as normal input tokens is enabled.
+func (s *SettingService) IsExcelBPSCacheCreationAsInputEnabled(ctx context.Context) bool {
+	if s == nil || s.settingRepo == nil {
+		return false
+	}
+	dbCtx, cancel := context.WithTimeout(ctx, gatewayForwardingDBTimeout)
+	defer cancel()
+	value, err := s.settingRepo.GetValue(dbCtx, SettingKeyExcelBPSCacheCreationAsInput)
+	if err != nil {
+		return false
+	}
+	return value == "true"
 }
 
 func (s *SystemSettings) imageRelayLimits() basispoints.ImageRelayLimits {

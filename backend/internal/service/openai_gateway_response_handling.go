@@ -671,6 +671,12 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 				data = string(sanitizedData)
 				line = "data: " + data
 			}
+			if reducedData, changed := ApplyOpenAICacheReductionToJSONBytes(c, dataBytes); changed {
+				dataBytes = reducedData
+				data = string(reducedData)
+				line = "data: " + data
+				eventType = effectiveOpenAISSEEventType(dataBytes, eventType)
+			}
 			// Replace model in response if needed.
 			if needModelReplace {
 				line = s.replaceModelInSSELine(line, mappedModel, originalModel)
@@ -1641,6 +1647,10 @@ func (s *OpenAIGatewayService) handleNonStreamingResponse(ctx context.Context, r
 		}
 	}
 
+	if reducedBody, changed := ApplyOpenAICacheReductionToJSONBytes(c, body); changed {
+		body = reducedBody
+	}
+
 	usageValue, usageOK := extractOpenAIUsageFromJSONBytes(body)
 	if !usageOK {
 		if bodyLooksLikeSSE {
@@ -1749,6 +1759,9 @@ func (s *OpenAIGatewayService) handleSSEToJSON(resp *http.Response, c *gin.Conte
 			}
 		}
 		finalResponse = supplementCompactionItemFromSSE(c, finalResponse, bodyText)
+		if reducedResponse, changed := ApplyOpenAICacheReductionToJSONBytes(c, finalResponse); changed {
+			finalResponse = reducedResponse
+		}
 		body = finalResponse
 		if originalModel != mappedModel {
 			body = s.replaceModelInResponseBody(body, mappedModel, originalModel)

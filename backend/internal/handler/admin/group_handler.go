@@ -209,6 +209,9 @@ type CreateGroupRequest struct {
 	ProfitControlEnabled            bool                          `json:"profit_control_enabled"`
 	ProfitMinMargin                 *float64                      `json:"profit_min_margin"`
 	ProfitSafetyBuffer              *float64                      `json:"profit_safety_buffer"`
+	CacheReductionEnabled           bool                          `json:"cache_reduction_enabled"`
+	CacheReductionMinRatio          *float64                      `json:"cache_reduction_min_ratio"`
+	CacheReductionMaxRatio          *float64                      `json:"cache_reduction_max_ratio"`
 	ImagePrice1K                    *float64                      `json:"image_price_1k"`
 	ImagePrice2K                    *float64                      `json:"image_price_2k"`
 	ImagePrice4K                    *float64                      `json:"image_price_4k"`
@@ -285,6 +288,9 @@ type UpdateGroupRequest struct {
 	ProfitControlEnabled            *bool                         `json:"profit_control_enabled"`
 	ProfitMinMargin                 *float64                      `json:"profit_min_margin"`
 	ProfitSafetyBuffer              *float64                      `json:"profit_safety_buffer"`
+	CacheReductionEnabled           *bool                         `json:"cache_reduction_enabled"`
+	CacheReductionMinRatio          *float64                      `json:"cache_reduction_min_ratio"`
+	CacheReductionMaxRatio          *float64                      `json:"cache_reduction_max_ratio"`
 	ImagePrice1K                    *float64                      `json:"image_price_1k"`
 	ImagePrice2K                    *float64                      `json:"image_price_2k"`
 	ImagePrice4K                    *float64                      `json:"image_price_4k"`
@@ -672,6 +678,11 @@ func (h *GroupHandler) Create(c *gin.Context) {
 		return
 	}
 
+	if err := service.ValidateCacheReductionConfig(service.NormalizeGroupPlatform(req.Platform), req.CacheReductionEnabled, float64ValueOrDefault(req.CacheReductionMinRatio, 0), float64ValueOrDefault(req.CacheReductionMaxRatio, 0)); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
 	group, err := h.adminService.CreateGroup(c.Request.Context(), &service.CreateGroupInput{
 		Name:                            req.Name,
 		Description:                     req.Description,
@@ -733,6 +744,9 @@ func (h *GroupHandler) Create(c *gin.Context) {
 		MaxReasoningEffort:              req.MaxReasoningEffort,
 		MaxReasoningEffortOverLimit:     req.MaxReasoningEffortOverLimit,
 		ReasoningEffortMappings:         req.ReasoningEffortMappings,
+		CacheReductionEnabled:           req.CacheReductionEnabled,
+		CacheReductionMinRatio:          float64ValueOrDefault(req.CacheReductionMinRatio, 0),
+		CacheReductionMaxRatio:          float64ValueOrDefault(req.CacheReductionMaxRatio, 0),
 		CopyAccountsFromGroupIDs:        req.CopyAccountsFromGroupIDs,
 	})
 	if err != nil {
@@ -846,6 +860,9 @@ func (h *GroupHandler) Update(c *gin.Context) {
 		ProfitControlEnabled:            req.ProfitControlEnabled,
 		ProfitMinMargin:                 req.ProfitMinMargin,
 		ProfitSafetyBuffer:              req.ProfitSafetyBuffer,
+		CacheReductionEnabled:           req.CacheReductionEnabled,
+		CacheReductionMinRatio:          req.CacheReductionMinRatio,
+		CacheReductionMaxRatio:          req.CacheReductionMaxRatio,
 		ImagePrice1K:                    req.ImagePrice1K,
 		ImagePrice2K:                    req.ImagePrice2K,
 		ImagePrice4K:                    req.ImagePrice4K,

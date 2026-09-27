@@ -1168,6 +1168,17 @@ export default {
         bufferRangeError: 'Safety buffer must be between 0 and 99.99',
         sumTooHigh: 'Min gross margin plus safety buffer must be less than 100%, otherwise every account would be excluded'
       },
+      cacheReduction: {
+        enable: 'Enable cache hit reduction',
+        enabledHint: 'Only applies to OpenAI and Composite groups. When upstream cached_tokens ≥ 1024, cached tokens reported to clients are randomly reduced within the min and max ratio range (floored to multiples of 128). The reduced tokens are converted and billed as standard input tokens.',
+        disabledHint: 'When disabled, upstream cached_tokens are passed through unchanged.',
+        minRatio: 'Min reduction ratio (%)',
+        minRatioHint: 'Percent input, e.g. 5 means 5%; stored as a decimal on the backend',
+        maxRatio: 'Max reduction ratio (%)',
+        maxRatioHint: 'Percent input, e.g. 15 means 15%; stored as a decimal on the backend',
+        ratioRangeError: 'Reduction ratio must be between 0 and 100',
+        minGreaterThanMax: 'Min reduction ratio cannot be greater than max reduction ratio'
+      },
       modelAllowlist: {
         title: 'Model Allowlist',
         hint: 'When enabled, models outside the allowlist are rejected with 404 model_not_found, and model listing endpoints only show allowlisted models. Entries support exact model IDs and trailing * wildcards. Note: Claude Code probes with haiku-family models for titles/summaries and /messages/count_tokens is also allowlist-controlled, so make sure the small models you need are selected too.',

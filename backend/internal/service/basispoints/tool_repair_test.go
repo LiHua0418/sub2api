@@ -487,3 +487,25 @@ func TestToolRepairPreservesAlreadyValidOperations(t *testing.T) {
 		})
 	}
 }
+
+func TestToolRepairStandardFunctionSuccess(t *testing.T) {
+	cache := new(ReplayCache)
+	_, bridge := repairBridge(t, cache)
+	// Original tool call failed because code had invalid envelope wrapping
+	original := []any{repairCall("bad_shell", "shell", `not valid envelope`)}
+	// Model repairs it to a valid JSON envelope targeting shell with standard arguments (e.g. command/cmd)
+	corrected := []any{repairCall("fixed_shell", "shell", `{"name":"shell","arguments":{"cmd":"ls -la"}}`)}
+	calls := 0
+	initial := repairResponse("resp", 10, 2, original...)
+	body := bridge.StreamWithToolRepair(context.Background(), io.NopCloser(strings.NewReader(sse(object{"type": "response.completed", "response": initial}))), func(context.Context, object, error) (object, error) {
+		calls++
+		return repairResponse("resp_fixed", 20, 3, corrected...), nil
+	})
+	events := repairEvents(t, body)
+	require.Equal(t, 1, calls)
+	require.NotEmpty(t, events)
+	require.Equal(t, "response.output_item.added", events[0]["type"])
+	// Terminal completed event must succeed
+	last := events[len(events)-1]
+	require.Equal(t, "response.completed", last["type"])
+}

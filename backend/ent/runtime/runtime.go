@@ -1231,6 +1231,18 @@ func init() {
 	groupDescProfitSafetyBuffer := groupFields[63].Descriptor()
 	// group.DefaultProfitSafetyBuffer holds the default value on creation for the profit_safety_buffer field.
 	group.DefaultProfitSafetyBuffer = groupDescProfitSafetyBuffer.Default.(float64)
+	// groupDescCacheReductionEnabled is the schema descriptor for cache_reduction_enabled field.
+	groupDescCacheReductionEnabled := groupFields[64].Descriptor()
+	// group.DefaultCacheReductionEnabled holds the default value on creation for the cache_reduction_enabled field.
+	group.DefaultCacheReductionEnabled = groupDescCacheReductionEnabled.Default.(bool)
+	// groupDescCacheReductionMinRatio is the schema descriptor for cache_reduction_min_ratio field.
+	groupDescCacheReductionMinRatio := groupFields[65].Descriptor()
+	// group.DefaultCacheReductionMinRatio holds the default value on creation for the cache_reduction_min_ratio field.
+	group.DefaultCacheReductionMinRatio = groupDescCacheReductionMinRatio.Default.(float64)
+	// groupDescCacheReductionMaxRatio is the schema descriptor for cache_reduction_max_ratio field.
+	groupDescCacheReductionMaxRatio := groupFields[66].Descriptor()
+	// group.DefaultCacheReductionMaxRatio holds the default value on creation for the cache_reduction_max_ratio field.
+	group.DefaultCacheReductionMaxRatio = groupDescCacheReductionMaxRatio.Default.(float64)
 	idempotencyrecordMixin := schema.IdempotencyRecord{}.Mixin()
 	idempotencyrecordMixinFields0 := idempotencyrecordMixin[0].Fields()
 	_ = idempotencyrecordMixinFields0

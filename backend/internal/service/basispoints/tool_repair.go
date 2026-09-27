@@ -242,12 +242,14 @@ func (b *Bridge) preservesToolOperations(original, corrected []object) bool {
 			}
 		} else {
 			var payload object
-			field := "code"
-			if strings.HasPrefix(text(transportArguments(corrected[i])["summary"]), functionCmdTransportPrefix) {
-				field = "cmd"
-			}
-			if decode([]byte(text(after["arguments"])), &payload) != nil || payload[field] != code {
+			if decode([]byte(text(after["arguments"])), &payload) != nil {
 				return false
+			}
+			toolName := text(after["name"])
+			if info, ok := b.tools[toolName]; ok && supportsFunctionCodeTransport(toolName, info.Kind, info.Parameters) {
+				if payload["code"] != code {
+					return false
+				}
 			}
 		}
 	}

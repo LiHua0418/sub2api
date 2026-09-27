@@ -1297,6 +1297,56 @@
           </div>
         </div>
 
+        <!-- 分组缓存命中削减（OpenAI / 组合平台 token 请求） -->
+        <div v-if="isCacheReductionPlatform(createForm.platform)" class="border-t pt-4">
+          <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+            <input
+              v-model="createForm.cache_reduction_enabled"
+              type="checkbox"
+              class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span>{{ t("admin.groups.cacheReduction.enable") }}</span>
+          </label>
+          <p class="mb-3 mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+            {{
+              createForm.cache_reduction_enabled
+                ? t("admin.groups.cacheReduction.enabledHint")
+                : t("admin.groups.cacheReduction.disabledHint")
+            }}
+          </p>
+          <div
+            v-if="createForm.cache_reduction_enabled"
+            class="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2"
+          >
+            <div>
+              <label class="input-label">{{ t("admin.groups.cacheReduction.minRatio") }}</label>
+              <input
+                v-model.number="createForm.cache_reduction_min_ratio_percent"
+                type="number"
+                step="0.1"
+                min="0"
+                max="100"
+                class="input"
+                placeholder="0"
+                :title="t('admin.groups.cacheReduction.minRatioHint')"
+              />
+            </div>
+            <div>
+              <label class="input-label">{{ t("admin.groups.cacheReduction.maxRatio") }}</label>
+              <input
+                v-model.number="createForm.cache_reduction_max_ratio_percent"
+                type="number"
+                step="0.1"
+                min="0"
+                max="100"
+                class="input"
+                placeholder="0"
+                :title="t('admin.groups.cacheReduction.maxRatioHint')"
+              />
+            </div>
+          </div>
+        </div>
+
         <!-- 支持的模型系列（仅 antigravity 平台） -->
         <div v-if="createForm.platform === 'antigravity'" class="border-t pt-4">
           <div class="mb-1.5 flex items-center gap-1">
@@ -2948,6 +2998,56 @@
           </div>
         </div>
 
+        <!-- 分组缓存命中削减（OpenAI / 组合平台 token 请求） -->
+        <div v-if="isCacheReductionPlatform(editForm.platform)" class="border-t pt-4">
+          <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+            <input
+              v-model="editForm.cache_reduction_enabled"
+              type="checkbox"
+              class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span>{{ t("admin.groups.cacheReduction.enable") }}</span>
+          </label>
+          <p class="mb-3 mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+            {{
+              editForm.cache_reduction_enabled
+                ? t("admin.groups.cacheReduction.enabledHint")
+                : t("admin.groups.cacheReduction.disabledHint")
+            }}
+          </p>
+          <div
+            v-if="editForm.cache_reduction_enabled"
+            class="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2"
+          >
+            <div>
+              <label class="input-label">{{ t("admin.groups.cacheReduction.minRatio") }}</label>
+              <input
+                v-model.number="editForm.cache_reduction_min_ratio_percent"
+                type="number"
+                step="0.1"
+                min="0"
+                max="100"
+                class="input"
+                placeholder="0"
+                :title="t('admin.groups.cacheReduction.minRatioHint')"
+              />
+            </div>
+            <div>
+              <label class="input-label">{{ t("admin.groups.cacheReduction.maxRatio") }}</label>
+              <input
+                v-model.number="editForm.cache_reduction_max_ratio_percent"
+                type="number"
+                step="0.1"
+                min="0"
+                max="100"
+                class="input"
+                placeholder="0"
+                :title="t('admin.groups.cacheReduction.maxRatioHint')"
+              />
+            </div>
+          </div>
+        </div>
+
         <!-- 支持的模型系列（仅 antigravity 平台） -->
         <div v-if="editForm.platform === 'antigravity'" class="border-t pt-4">
           <div class="mb-1.5 flex items-center gap-1">
@@ -4400,6 +4500,13 @@ import {
   type ProfitControlFormState,
 } from "./groupsProfitControl";
 import {
+  isCacheReductionPlatform,
+  cacheReductionPercentToDecimal,
+  cacheReductionDecimalToPercent,
+  validateCacheReductionFormState,
+  type CacheReductionFormState,
+} from "./groupsCacheReduction";
+import {
   normalizeReasoningEffortForPlatform,
   normalizeReasoningEffortOverLimit,
   reasoningEffortMappingsToAPI,
@@ -5033,6 +5140,10 @@ const createForm = reactive({
   profit_control_enabled: false,
   profit_min_margin_percent: 0,
   profit_safety_buffer_percent: 0,
+  // 缓存命中削减控制（OpenAI / 组合平台）；界面按百分比输入，提交时转小数
+  cache_reduction_enabled: false,
+  cache_reduction_min_ratio_percent: 0,
+  cache_reduction_max_ratio_percent: 0,
   // Claude Code 客户端限制（仅 anthropic 平台使用）
   claude_code_only: false,
   fallback_group_id: null as number | null,
@@ -5400,6 +5511,10 @@ const editForm = reactive({
   profit_control_enabled: false,
   profit_min_margin_percent: 0,
   profit_safety_buffer_percent: 0,
+  // 缓存命中削减控制（OpenAI / 组合平台）；界面按百分比输入，提交时转小数
+  cache_reduction_enabled: false,
+  cache_reduction_min_ratio_percent: 0,
+  cache_reduction_max_ratio_percent: 0,
   // Claude Code 客户端限制（仅 anthropic 平台使用）
   claude_code_only: false,
   fallback_group_id: null as number | null,
@@ -5859,6 +5974,9 @@ const closeCreateModal = () => {
   createForm.profit_control_enabled = false;
   createForm.profit_min_margin_percent = 0;
   createForm.profit_safety_buffer_percent = 0;
+  createForm.cache_reduction_enabled = false;
+  createForm.cache_reduction_min_ratio_percent = 0;
+  createForm.cache_reduction_max_ratio_percent = 0;
   createForm.claude_code_only = false;
   createForm.fallback_group_id = null;
   createForm.fallback_group_id_on_invalid_request = null;
@@ -5932,6 +6050,15 @@ const validateGroupReasoningMultipliers = (pricing: PricingFormEntry[]): boolean
   return true;
 };
 
+const validateCacheReductionForm = (form: CacheReductionFormState): boolean => {
+  const errorKey = validateCacheReductionFormState(form);
+  if (errorKey) {
+    appStore.showError(t(`admin.groups.cacheReduction.${errorKey}`));
+    return false;
+  }
+  return true;
+};
+
 const handleCreateGroup = async () => {
   if (!createForm.name.trim()) {
     appStore.showError(t("admin.groups.nameRequired"));
@@ -5945,6 +6072,9 @@ const handleCreateGroup = async () => {
     return;
   }
   if (!validateProfitControlForm(createForm)) {
+    return;
+  }
+  if (!validateCacheReductionForm(createForm)) {
     return;
   }
   if (!validateGroupReasoningMultipliers(createForm.model_pricing)) return;
@@ -6023,9 +6153,21 @@ const handleCreateGroup = async () => {
       profit_safety_buffer: percentToDecimal(
         createForm.profit_safety_buffer_percent,
       ),
+      // 缓存命中削减：界面百分比转小数提交；仅 OpenAI / 组合平台可启用
+      cache_reduction_enabled:
+        isCacheReductionPlatform(createForm.platform) &&
+        createForm.cache_reduction_enabled,
+      cache_reduction_min_ratio: cacheReductionPercentToDecimal(
+        createForm.cache_reduction_min_ratio_percent,
+      ),
+      cache_reduction_max_ratio: cacheReductionPercentToDecimal(
+        createForm.cache_reduction_max_ratio_percent,
+      ),
     };
     delete (requestData as Record<string, unknown>).profit_min_margin_percent;
     delete (requestData as Record<string, unknown>).profit_safety_buffer_percent;
+    delete (requestData as Record<string, unknown>).cache_reduction_min_ratio_percent;
+    delete (requestData as Record<string, unknown>).cache_reduction_max_ratio_percent;
     // v-model.number 清空输入框时产生 ""，转为 null 让后端设为无限制
     const emptyToNull = (v: any) => (v === "" ? null : v);
     requestData.daily_limit_usd = emptyToNull(requestData.daily_limit_usd);
@@ -6151,6 +6293,13 @@ const handleEdit = async (group: AdminGroup) => {
   editForm.profit_safety_buffer_percent = decimalToPercent(
     group.profit_safety_buffer ?? 0,
   );
+  editForm.cache_reduction_enabled = group.cache_reduction_enabled ?? false;
+  editForm.cache_reduction_min_ratio_percent = cacheReductionDecimalToPercent(
+    group.cache_reduction_min_ratio ?? 0,
+  );
+  editForm.cache_reduction_max_ratio_percent = cacheReductionDecimalToPercent(
+    group.cache_reduction_max_ratio ?? 0,
+  );
   editForm.claude_code_only = group.claude_code_only || false;
   editForm.fallback_group_id = group.fallback_group_id;
   editForm.fallback_group_id_on_invalid_request =
@@ -6241,6 +6390,9 @@ const closeEditModal = () => {
   editForm.profit_control_enabled = false;
   editForm.profit_min_margin_percent = 0;
   editForm.profit_safety_buffer_percent = 0;
+  editForm.cache_reduction_enabled = false;
+  editForm.cache_reduction_min_ratio_percent = 0;
+  editForm.cache_reduction_max_ratio_percent = 0;
   editForm.video_rate_independent = false;
   editForm.video_rate_multiplier = 1;
   editForm.video_price_480p = null;
@@ -6278,6 +6430,9 @@ const handleUpdateGroup = async () => {
     return;
   }
   if (!validateProfitControlForm(editForm)) {
+    return;
+  }
+  if (!validateCacheReductionForm(editForm)) {
     return;
   }
   if (!validateGroupReasoningMultipliers(editForm.model_pricing)) return;
@@ -6373,9 +6528,21 @@ const handleUpdateGroup = async () => {
       profit_safety_buffer: percentToDecimal(
         editForm.profit_safety_buffer_percent,
       ),
+      // 缓存命中削减：界面百分比转小数提交；仅 OpenAI / 组合平台可启用
+      cache_reduction_enabled:
+        isCacheReductionPlatform(editForm.platform) &&
+        editForm.cache_reduction_enabled,
+      cache_reduction_min_ratio: cacheReductionPercentToDecimal(
+        editForm.cache_reduction_min_ratio_percent,
+      ),
+      cache_reduction_max_ratio: cacheReductionPercentToDecimal(
+        editForm.cache_reduction_max_ratio_percent,
+      ),
     };
     delete (payload as Record<string, unknown>).profit_min_margin_percent;
     delete (payload as Record<string, unknown>).profit_safety_buffer_percent;
+    delete (payload as Record<string, unknown>).cache_reduction_min_ratio_percent;
+    delete (payload as Record<string, unknown>).cache_reduction_max_ratio_percent;
     // v-model.number 清空输入框时产生 ""，转为 null 让后端设为无限制
     const emptyToNull = (v: any) => (v === "" ? null : v);
     payload.daily_limit_usd = emptyToNull(payload.daily_limit_usd);
@@ -6753,6 +6920,11 @@ watch(
       createForm.profit_min_margin_percent = 0;
       createForm.profit_safety_buffer_percent = 0;
     }
+    if (!isCacheReductionPlatform(newVal)) {
+      createForm.cache_reduction_enabled = false;
+      createForm.cache_reduction_min_ratio_percent = 0;
+      createForm.cache_reduction_max_ratio_percent = 0;
+    }
     createForm.max_reasoning_effort = normalizeReasoningEffortForPlatform(
       newVal,
       createForm.max_reasoning_effort,
@@ -6809,6 +6981,11 @@ watch(
       editForm.profit_control_enabled = false;
       editForm.profit_min_margin_percent = 0;
       editForm.profit_safety_buffer_percent = 0;
+    }
+    if (!isCacheReductionPlatform(newVal)) {
+      editForm.cache_reduction_enabled = false;
+      editForm.cache_reduction_min_ratio_percent = 0;
+      editForm.cache_reduction_max_ratio_percent = 0;
     }
     editForm.max_reasoning_effort = normalizeReasoningEffortForPlatform(
       newVal,

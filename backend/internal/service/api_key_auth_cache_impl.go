@@ -14,7 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 26 // v26: group stream_only and user-group denied models (enforcing semantics)
+const apiKeyAuthSnapshotVersion = 28 // v28: group cache_reduction projection fix
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int
@@ -454,6 +454,9 @@ func (s *APIKeyService) snapshotFromAPIKey(ctx context.Context, apiKey *APIKey) 
 			ProfitControlEnabled:            apiKey.Group.ProfitControlEnabled,
 			ProfitMinMargin:                 apiKey.Group.ProfitMinMargin,
 			ProfitSafetyBuffer:              apiKey.Group.ProfitSafetyBuffer,
+			CacheReductionEnabled:           apiKey.Group.CacheReductionEnabled,
+			CacheReductionMinRatio:          apiKey.Group.CacheReductionMinRatio,
+			CacheReductionMaxRatio:          apiKey.Group.CacheReductionMaxRatio,
 		}
 	}
 	return snapshot
@@ -558,6 +561,9 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 			ProfitControlEnabled:            snapshot.Group.ProfitControlEnabled,
 			ProfitMinMargin:                 snapshot.Group.ProfitMinMargin,
 			ProfitSafetyBuffer:              snapshot.Group.ProfitSafetyBuffer,
+			CacheReductionEnabled:           snapshot.Group.CacheReductionEnabled,
+			CacheReductionMinRatio:          snapshot.Group.CacheReductionMinRatio,
+			CacheReductionMaxRatio:          snapshot.Group.CacheReductionMaxRatio,
 		}
 	}
 	s.compileAPIKeyIPRules(apiKey)

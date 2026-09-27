@@ -305,6 +305,10 @@ func (s *OpenAIGatewayService) forwardAsChatCompletions(
 	}
 	logger.L().Debug("openai chat_completions: model mapping applied", logFields...)
 
+	if account.IsExcelBPSEnabledForModel(billingModel) {
+		return s.forwardExcelBPSAsChatCompletions(ctx, c, account, responsesBody, originalModel, billingModel, upstreamModel, clientStream, startTime, len(body))
+	}
+
 	if account.UsesOpenAICodexProtocol() {
 		var reqBody map[string]any
 		if err := json.Unmarshal(responsesBody, &reqBody); err != nil {
@@ -784,6 +788,9 @@ func (s *OpenAIGatewayService) handleChatStreamingResponse(
 
 	processDataLine := func(payload string) bool {
 		payload = string(restoreCodexToolNamesFromContext(c, []byte(payload)))
+		if reduced, changed := ApplyOpenAICacheReductionToJSONBytes(c, []byte(payload)); changed {
+			payload = string(reduced)
+		}
 		if firstChunk {
 			firstChunk = false
 			ms := int(time.Since(startTime).Milliseconds())

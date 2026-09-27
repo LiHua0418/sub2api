@@ -920,6 +920,48 @@ func (_c *GroupCreate) SetNillableProfitSafetyBuffer(v *float64) *GroupCreate {
 	return _c
 }
 
+// SetCacheReductionEnabled sets the "cache_reduction_enabled" field.
+func (_c *GroupCreate) SetCacheReductionEnabled(v bool) *GroupCreate {
+	_c.mutation.SetCacheReductionEnabled(v)
+	return _c
+}
+
+// SetNillableCacheReductionEnabled sets the "cache_reduction_enabled" field if the given value is not nil.
+func (_c *GroupCreate) SetNillableCacheReductionEnabled(v *bool) *GroupCreate {
+	if v != nil {
+		_c.SetCacheReductionEnabled(*v)
+	}
+	return _c
+}
+
+// SetCacheReductionMinRatio sets the "cache_reduction_min_ratio" field.
+func (_c *GroupCreate) SetCacheReductionMinRatio(v float64) *GroupCreate {
+	_c.mutation.SetCacheReductionMinRatio(v)
+	return _c
+}
+
+// SetNillableCacheReductionMinRatio sets the "cache_reduction_min_ratio" field if the given value is not nil.
+func (_c *GroupCreate) SetNillableCacheReductionMinRatio(v *float64) *GroupCreate {
+	if v != nil {
+		_c.SetCacheReductionMinRatio(*v)
+	}
+	return _c
+}
+
+// SetCacheReductionMaxRatio sets the "cache_reduction_max_ratio" field.
+func (_c *GroupCreate) SetCacheReductionMaxRatio(v float64) *GroupCreate {
+	_c.mutation.SetCacheReductionMaxRatio(v)
+	return _c
+}
+
+// SetNillableCacheReductionMaxRatio sets the "cache_reduction_max_ratio" field if the given value is not nil.
+func (_c *GroupCreate) SetNillableCacheReductionMaxRatio(v *float64) *GroupCreate {
+	if v != nil {
+		_c.SetCacheReductionMaxRatio(*v)
+	}
+	return _c
+}
+
 // AddAPIKeyIDs adds the "api_keys" edge to the APIKey entity by IDs.
 func (_c *GroupCreate) AddAPIKeyIDs(ids ...int64) *GroupCreate {
 	_c.mutation.AddAPIKeyIDs(ids...)
@@ -1229,6 +1271,18 @@ func (_c *GroupCreate) defaults() error {
 		v := group.DefaultProfitSafetyBuffer
 		_c.mutation.SetProfitSafetyBuffer(v)
 	}
+	if _, ok := _c.mutation.CacheReductionEnabled(); !ok {
+		v := group.DefaultCacheReductionEnabled
+		_c.mutation.SetCacheReductionEnabled(v)
+	}
+	if _, ok := _c.mutation.CacheReductionMinRatio(); !ok {
+		v := group.DefaultCacheReductionMinRatio
+		_c.mutation.SetCacheReductionMinRatio(v)
+	}
+	if _, ok := _c.mutation.CacheReductionMaxRatio(); !ok {
+		v := group.DefaultCacheReductionMaxRatio
+		_c.mutation.SetCacheReductionMaxRatio(v)
+	}
 	return nil
 }
 
@@ -1438,6 +1492,15 @@ func (_c *GroupCreate) check() error {
 	}
 	if _, ok := _c.mutation.ProfitSafetyBuffer(); !ok {
 		return &ValidationError{Name: "profit_safety_buffer", err: errors.New(`ent: missing required field "Group.profit_safety_buffer"`)}
+	}
+	if _, ok := _c.mutation.CacheReductionEnabled(); !ok {
+		return &ValidationError{Name: "cache_reduction_enabled", err: errors.New(`ent: missing required field "Group.cache_reduction_enabled"`)}
+	}
+	if _, ok := _c.mutation.CacheReductionMinRatio(); !ok {
+		return &ValidationError{Name: "cache_reduction_min_ratio", err: errors.New(`ent: missing required field "Group.cache_reduction_min_ratio"`)}
+	}
+	if _, ok := _c.mutation.CacheReductionMaxRatio(); !ok {
+		return &ValidationError{Name: "cache_reduction_max_ratio", err: errors.New(`ent: missing required field "Group.cache_reduction_max_ratio"`)}
 	}
 	return nil
 }
@@ -1733,6 +1796,18 @@ func (_c *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.ProfitSafetyBuffer(); ok {
 		_spec.SetField(group.FieldProfitSafetyBuffer, field.TypeFloat64, value)
 		_node.ProfitSafetyBuffer = value
+	}
+	if value, ok := _c.mutation.CacheReductionEnabled(); ok {
+		_spec.SetField(group.FieldCacheReductionEnabled, field.TypeBool, value)
+		_node.CacheReductionEnabled = value
+	}
+	if value, ok := _c.mutation.CacheReductionMinRatio(); ok {
+		_spec.SetField(group.FieldCacheReductionMinRatio, field.TypeFloat64, value)
+		_node.CacheReductionMinRatio = value
+	}
+	if value, ok := _c.mutation.CacheReductionMaxRatio(); ok {
+		_spec.SetField(group.FieldCacheReductionMaxRatio, field.TypeFloat64, value)
+		_node.CacheReductionMaxRatio = value
 	}
 	if nodes := _c.mutation.APIKeysIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
@@ -2955,6 +3030,54 @@ func (u *GroupUpsert) UpdateProfitSafetyBuffer() *GroupUpsert {
 // AddProfitSafetyBuffer adds v to the "profit_safety_buffer" field.
 func (u *GroupUpsert) AddProfitSafetyBuffer(v float64) *GroupUpsert {
 	u.Add(group.FieldProfitSafetyBuffer, v)
+	return u
+}
+
+// SetCacheReductionEnabled sets the "cache_reduction_enabled" field.
+func (u *GroupUpsert) SetCacheReductionEnabled(v bool) *GroupUpsert {
+	u.Set(group.FieldCacheReductionEnabled, v)
+	return u
+}
+
+// UpdateCacheReductionEnabled sets the "cache_reduction_enabled" field to the value that was provided on create.
+func (u *GroupUpsert) UpdateCacheReductionEnabled() *GroupUpsert {
+	u.SetExcluded(group.FieldCacheReductionEnabled)
+	return u
+}
+
+// SetCacheReductionMinRatio sets the "cache_reduction_min_ratio" field.
+func (u *GroupUpsert) SetCacheReductionMinRatio(v float64) *GroupUpsert {
+	u.Set(group.FieldCacheReductionMinRatio, v)
+	return u
+}
+
+// UpdateCacheReductionMinRatio sets the "cache_reduction_min_ratio" field to the value that was provided on create.
+func (u *GroupUpsert) UpdateCacheReductionMinRatio() *GroupUpsert {
+	u.SetExcluded(group.FieldCacheReductionMinRatio)
+	return u
+}
+
+// AddCacheReductionMinRatio adds v to the "cache_reduction_min_ratio" field.
+func (u *GroupUpsert) AddCacheReductionMinRatio(v float64) *GroupUpsert {
+	u.Add(group.FieldCacheReductionMinRatio, v)
+	return u
+}
+
+// SetCacheReductionMaxRatio sets the "cache_reduction_max_ratio" field.
+func (u *GroupUpsert) SetCacheReductionMaxRatio(v float64) *GroupUpsert {
+	u.Set(group.FieldCacheReductionMaxRatio, v)
+	return u
+}
+
+// UpdateCacheReductionMaxRatio sets the "cache_reduction_max_ratio" field to the value that was provided on create.
+func (u *GroupUpsert) UpdateCacheReductionMaxRatio() *GroupUpsert {
+	u.SetExcluded(group.FieldCacheReductionMaxRatio)
+	return u
+}
+
+// AddCacheReductionMaxRatio adds v to the "cache_reduction_max_ratio" field.
+func (u *GroupUpsert) AddCacheReductionMaxRatio(v float64) *GroupUpsert {
+	u.Add(group.FieldCacheReductionMaxRatio, v)
 	return u
 }
 
@@ -4249,6 +4372,62 @@ func (u *GroupUpsertOne) AddProfitSafetyBuffer(v float64) *GroupUpsertOne {
 func (u *GroupUpsertOne) UpdateProfitSafetyBuffer() *GroupUpsertOne {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdateProfitSafetyBuffer()
+	})
+}
+
+// SetCacheReductionEnabled sets the "cache_reduction_enabled" field.
+func (u *GroupUpsertOne) SetCacheReductionEnabled(v bool) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetCacheReductionEnabled(v)
+	})
+}
+
+// UpdateCacheReductionEnabled sets the "cache_reduction_enabled" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdateCacheReductionEnabled() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateCacheReductionEnabled()
+	})
+}
+
+// SetCacheReductionMinRatio sets the "cache_reduction_min_ratio" field.
+func (u *GroupUpsertOne) SetCacheReductionMinRatio(v float64) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetCacheReductionMinRatio(v)
+	})
+}
+
+// AddCacheReductionMinRatio adds v to the "cache_reduction_min_ratio" field.
+func (u *GroupUpsertOne) AddCacheReductionMinRatio(v float64) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.AddCacheReductionMinRatio(v)
+	})
+}
+
+// UpdateCacheReductionMinRatio sets the "cache_reduction_min_ratio" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdateCacheReductionMinRatio() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateCacheReductionMinRatio()
+	})
+}
+
+// SetCacheReductionMaxRatio sets the "cache_reduction_max_ratio" field.
+func (u *GroupUpsertOne) SetCacheReductionMaxRatio(v float64) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetCacheReductionMaxRatio(v)
+	})
+}
+
+// AddCacheReductionMaxRatio adds v to the "cache_reduction_max_ratio" field.
+func (u *GroupUpsertOne) AddCacheReductionMaxRatio(v float64) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.AddCacheReductionMaxRatio(v)
+	})
+}
+
+// UpdateCacheReductionMaxRatio sets the "cache_reduction_max_ratio" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdateCacheReductionMaxRatio() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateCacheReductionMaxRatio()
 	})
 }
 
@@ -5709,6 +5888,62 @@ func (u *GroupUpsertBulk) AddProfitSafetyBuffer(v float64) *GroupUpsertBulk {
 func (u *GroupUpsertBulk) UpdateProfitSafetyBuffer() *GroupUpsertBulk {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdateProfitSafetyBuffer()
+	})
+}
+
+// SetCacheReductionEnabled sets the "cache_reduction_enabled" field.
+func (u *GroupUpsertBulk) SetCacheReductionEnabled(v bool) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetCacheReductionEnabled(v)
+	})
+}
+
+// UpdateCacheReductionEnabled sets the "cache_reduction_enabled" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdateCacheReductionEnabled() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateCacheReductionEnabled()
+	})
+}
+
+// SetCacheReductionMinRatio sets the "cache_reduction_min_ratio" field.
+func (u *GroupUpsertBulk) SetCacheReductionMinRatio(v float64) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetCacheReductionMinRatio(v)
+	})
+}
+
+// AddCacheReductionMinRatio adds v to the "cache_reduction_min_ratio" field.
+func (u *GroupUpsertBulk) AddCacheReductionMinRatio(v float64) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.AddCacheReductionMinRatio(v)
+	})
+}
+
+// UpdateCacheReductionMinRatio sets the "cache_reduction_min_ratio" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdateCacheReductionMinRatio() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateCacheReductionMinRatio()
+	})
+}
+
+// SetCacheReductionMaxRatio sets the "cache_reduction_max_ratio" field.
+func (u *GroupUpsertBulk) SetCacheReductionMaxRatio(v float64) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetCacheReductionMaxRatio(v)
+	})
+}
+
+// AddCacheReductionMaxRatio adds v to the "cache_reduction_max_ratio" field.
+func (u *GroupUpsertBulk) AddCacheReductionMaxRatio(v float64) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.AddCacheReductionMaxRatio(v)
+	})
+}
+
+// UpdateCacheReductionMaxRatio sets the "cache_reduction_max_ratio" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdateCacheReductionMaxRatio() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateCacheReductionMaxRatio()
 	})
 }
 

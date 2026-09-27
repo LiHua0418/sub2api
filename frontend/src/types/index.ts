@@ -640,6 +640,11 @@ export interface AdminGroup extends Group {
   profit_min_margin: number
   profit_safety_buffer: number
 
+  // 缓存命中削减控制（openai/composite 分组可启用；min/max ratio 为小数存储）
+  cache_reduction_enabled: boolean
+  cache_reduction_min_ratio: number
+  cache_reduction_max_ratio: number
+
   // 模型路由配置（仅管理员可见，内部信息）
   model_routing: Record<string, number[]> | null
   model_routing_enabled: boolean
@@ -837,6 +842,10 @@ export interface CreateGroupRequest {
   profit_control_enabled?: boolean
   profit_min_margin?: number
   profit_safety_buffer?: number
+  // 缓存命中削减控制（openai/composite 平台；min/max 为小数）
+  cache_reduction_enabled?: boolean
+  cache_reduction_min_ratio?: number
+  cache_reduction_max_ratio?: number
   claude_code_only?: boolean
   fallback_group_id?: number | null
   fallback_group_id_on_invalid_request?: number | null
@@ -904,6 +913,10 @@ export interface UpdateGroupRequest {
   profit_control_enabled?: boolean
   profit_min_margin?: number
   profit_safety_buffer?: number
+  // 缓存命中削减控制（openai/composite 平台；min/max 为小数）
+  cache_reduction_enabled?: boolean
+  cache_reduction_min_ratio?: number
+  cache_reduction_max_ratio?: number
   claude_code_only?: boolean
   fallback_group_id?: number | null
   fallback_group_id_on_invalid_request?: number | null

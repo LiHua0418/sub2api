@@ -166,3 +166,5 @@ issues/
 /plugins/
 
 !docs/codex-ticket-pinning.md
+sub2api-bin
+backend/sub2api-bin

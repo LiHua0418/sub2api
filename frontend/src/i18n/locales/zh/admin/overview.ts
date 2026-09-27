@@ -1165,6 +1165,17 @@ export default {
         bufferRangeError: '安全缓冲应在 0 到 99.99 之间',
         sumTooHigh: '最低毛利率与安全缓冲之和必须小于 100%，否则将排除全部账号'
       },
+      cacheReduction: {
+        enable: '启用缓存命中削减',
+        enabledHint: '仅对 OpenAI 与组合分组生效。上游响应 cached_tokens ≥ 1024 时，在设置的最小与最大比例区间内随机削减返回给客户端的缓存命中数（结果向下对齐到 128 的整数倍），被削减部分转为未命中输入 token 计费。',
+        disabledHint: '关闭后原样透传上游返回的 cached_tokens。',
+        minRatio: '最小削减比例（%）',
+        minRatioHint: '百分比输入，如 5 表示 5%；后端按小数存储',
+        maxRatio: '最大削减比例（%）',
+        maxRatioHint: '百分比输入，如 15 表示 15%；后端按小数存储',
+        ratioRangeError: '削减比例必须在 0 到 100 之间',
+        minGreaterThanMax: '最小削减比例不能大于最大削减比例'
+      },
       modelAllowlist: {
         title: '模型白名单',
         hint: '开启后，不在白名单中的模型会被拒绝（404 model_not_found），模型列表接口也只展示白名单内的模型。条目支持精确模型 ID 与末尾 * 通配。注意：Claude Code 会用 haiku 系小模型做标题/摘要等探测，/messages/count_tokens 同样受白名单控制，请一并勾选所需的小模型。',

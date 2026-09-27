@@ -144,6 +144,11 @@ type APIKeyAuthGroupSnapshot struct {
 	ProfitControlEnabled bool    `json:"profit_control_enabled"`
 	ProfitMinMargin      float64 `json:"profit_min_margin"`
 	ProfitSafetyBuffer   float64 `json:"profit_safety_buffer"`
+
+	// 上游缓存削减配置
+	CacheReductionEnabled  bool    `json:"cache_reduction_enabled"`
+	CacheReductionMinRatio float64 `json:"cache_reduction_min_ratio"`
+	CacheReductionMaxRatio float64 `json:"cache_reduction_max_ratio"`
 }
 
 // APIKeyAuthCacheEntry 缓存条目，支持负缓存

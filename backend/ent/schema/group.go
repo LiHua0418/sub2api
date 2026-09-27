@@ -308,6 +308,19 @@ func (Group) Fields() []ent.Field {
 			SchemaType(map[string]string{dialect.Postgres: "decimal(10,4)"}).
 			Default(0).
 			Comment("安全缓冲，小数；与 margin 相加后从下游倍率中扣除，默认 0"),
+
+		// 上游缓存削减：针对 OpenAI/Codex 管道
+		field.Bool("cache_reduction_enabled").
+			Default(false).
+			Comment("是否启用上游缓存削减"),
+		field.Float("cache_reduction_min_ratio").
+			SchemaType(map[string]string{dialect.Postgres: "decimal(10,4)"}).
+			Default(0).
+			Comment("缓存削减最小比例，小数（0.00-1.00）"),
+		field.Float("cache_reduction_max_ratio").
+			SchemaType(map[string]string{dialect.Postgres: "decimal(10,4)"}).
+			Default(0).
+			Comment("缓存削减最大比例，小数（0.00-1.00）"),
 	}
 }
 

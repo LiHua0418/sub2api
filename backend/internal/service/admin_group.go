@@ -488,6 +488,13 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		return nil, err
 	}
 
+	cacheReductionMinRatio := input.CacheReductionMinRatio
+	cacheReductionMaxRatio := input.CacheReductionMaxRatio
+	cacheReductionEnabled, cacheReductionMinRatio, cacheReductionMaxRatio := NormalizeCacheReductionConfig(platform, input.CacheReductionEnabled, cacheReductionMinRatio, cacheReductionMaxRatio)
+	if err := ValidateCacheReductionConfig(platform, cacheReductionEnabled, cacheReductionMinRatio, cacheReductionMaxRatio); err != nil {
+		return nil, infraerrors.BadRequest("INVALID_CACHE_REDUCTION_CONFIG", err.Error())
+	}
+
 	// 校验降级分组
 	if input.FallbackGroupID != nil {
 		if err := s.validateFallbackGroup(ctx, 0, *input.FallbackGroupID); err != nil {
@@ -580,6 +587,9 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		ProfitControlEnabled:            profitControlEnabled,
 		ProfitMinMargin:                 profitMinMargin,
 		ProfitSafetyBuffer:              profitSafetyBuffer,
+		CacheReductionEnabled:           cacheReductionEnabled,
+		CacheReductionMinRatio:          cacheReductionMinRatio,
+		CacheReductionMaxRatio:          cacheReductionMaxRatio,
 		ImagePrice1K:                    imagePrice1K,
 		ImagePrice2K:                    imagePrice2K,
 		ImagePrice4K:                    imagePrice4K,
@@ -886,6 +896,19 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 	group.ProfitControlEnabled, group.ProfitMinMargin, group.ProfitSafetyBuffer = NormalizeProfitControlConfig(group.Platform, group.ProfitControlEnabled, group.ProfitMinMargin, group.ProfitSafetyBuffer)
 	if err := ValidateProfitControlConfig(group.Platform, group.ProfitControlEnabled, group.ProfitMinMargin, group.ProfitSafetyBuffer); err != nil {
 		return nil, err
+	}
+	if input.CacheReductionEnabled != nil {
+		group.CacheReductionEnabled = *input.CacheReductionEnabled
+	}
+	if input.CacheReductionMinRatio != nil {
+		group.CacheReductionMinRatio = *input.CacheReductionMinRatio
+	}
+	if input.CacheReductionMaxRatio != nil {
+		group.CacheReductionMaxRatio = *input.CacheReductionMaxRatio
+	}
+	group.CacheReductionEnabled, group.CacheReductionMinRatio, group.CacheReductionMaxRatio = NormalizeCacheReductionConfig(group.Platform, group.CacheReductionEnabled, group.CacheReductionMinRatio, group.CacheReductionMaxRatio)
+	if err := ValidateCacheReductionConfig(group.Platform, group.CacheReductionEnabled, group.CacheReductionMinRatio, group.CacheReductionMaxRatio); err != nil {
+		return nil, infraerrors.BadRequest("INVALID_CACHE_REDUCTION_CONFIG", err.Error())
 	}
 	if input.ImagePrice1K != nil {
 		group.ImagePrice1K = normalizePrice(input.ImagePrice1K)

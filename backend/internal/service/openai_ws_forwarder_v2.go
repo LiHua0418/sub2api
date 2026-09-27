@@ -744,6 +744,9 @@ readLoop:
 			}
 			message = restoreCodexToolNamesFromContext(c, message)
 		}
+		if reduced, changed := ApplyOpenAICacheReductionToJSONBytes(c, message); changed {
+			message = reduced
+		}
 		if openAIWSMessageShouldParseUsage(eventType, message) {
 			parseOpenAIWSResponseUsageFromCompletedEvent(message, usage)
 		}
@@ -892,6 +895,9 @@ readLoop:
 			finalResponse = s.replaceModelInResponseBody(finalResponse, mappedModel, originalModel)
 		}
 		finalResponse = s.correctToolCallsInResponseBody(finalResponse)
+		if reduced, changed := ApplyOpenAICacheReductionToJSONBytes(c, finalResponse); changed {
+			finalResponse = reduced
+		}
 		populateOpenAIUsageFromResponseJSON(finalResponse, usage)
 		if responseID == "" {
 			responseID = strings.TrimSpace(gjson.GetBytes(finalResponse, "id").String())
