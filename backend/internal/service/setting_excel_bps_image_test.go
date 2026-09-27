@@ -140,7 +140,7 @@ func TestExcelBPSImageSettingsRejectInvalidUpdatesAtomically(t *testing.T) {
 	settings := NewSettingService(repo, &config.Config{})
 	require.NoError(t, settings.UpdateSettings(ctx, &SystemSettings{ExcelBPSImageRelayEnabled: true, ExcelBPSImageBaseURL: "https://images.example"}))
 	for _, limits := range []struct{ body, budget, requests int }{
-		{129, 2048, 32}, {64, 511, 32}, {64, 2049, 32}, {64, 512, 513}, {128, 512, 32},
+		{129, 8192, 32}, {64, 511, 32}, {64, 16385, 32}, {64, 512, 4097}, {128, 512, 32},
 	} {
 		err := settings.UpdateSettings(ctx, &SystemSettings{
 			ExcelBPSImageRelayEnabled: true, ExcelBPSImageBaseURL: "https://images.example",

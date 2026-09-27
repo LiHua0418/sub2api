@@ -68,11 +68,11 @@ func validateExcelBPSImageCapacity(bodyLimitMiB, budgetMiB, maxRequests int) err
 	if bodyLimitMiB < 1 || bodyLimitMiB > 128 {
 		return infraerrors.BadRequest("INVALID_EXCEL_BPS_IMAGE_CAPACITY", "Image request body limit must be 1-128 MiB")
 	}
-	if budgetMiB < 512 || budgetMiB > 2048 || budgetMiB < bodyLimitMiB*8 {
-		return infraerrors.BadRequest("INVALID_EXCEL_BPS_IMAGE_CAPACITY", "Image request budget must be 512-2048 MiB and at least eight times the body limit")
+	if budgetMiB < 512 || budgetMiB > 16384 || budgetMiB < bodyLimitMiB*8 {
+		return infraerrors.BadRequest("INVALID_EXCEL_BPS_IMAGE_CAPACITY", "Image request budget must be 512-16384 MiB and at least eight times the body limit")
 	}
-	if maxRequests < 1 || maxRequests > 512 {
-		return infraerrors.BadRequest("INVALID_EXCEL_BPS_IMAGE_CAPACITY", "Image concurrent requests must be 1-512")
+	if maxRequests < 1 || maxRequests > 4096 {
+		return infraerrors.BadRequest("INVALID_EXCEL_BPS_IMAGE_CAPACITY", "Image concurrent requests must be 1-4096")
 	}
 	return nil
 }
