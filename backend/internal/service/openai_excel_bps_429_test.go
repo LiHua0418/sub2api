@@ -33,3 +33,28 @@ func TestExtractExcelBPS429WaitDuration(t *testing.T) {
 	msgGeneric := []byte(`{"error": {"message": "Rate limit exceeded", "type": "requests"}}`)
 	require.Equal(t, time.Duration(0), extractExcelBPS429WaitDuration(msgGeneric, nil))
 }
+
+func TestNormalizeExcelBPSToolChoice(t *testing.T) {
+	// 1. auto / none untouched
+	bodyAuto := []byte(`{"tool_choice":"auto"}`)
+	out, changed := normalizeExcelBPSToolChoice(bodyAuto)
+	require.False(t, changed)
+	require.Equal(t, bodyAuto, out)
+
+	bodyNone := []byte(`{"tool_choice":"none"}`)
+	out, changed = normalizeExcelBPSToolChoice(bodyNone)
+	require.False(t, changed)
+	require.Equal(t, bodyNone, out)
+
+	// 2. required normalized to auto
+	bodyReq := []byte(`{"tool_choice":"required"}`)
+	out, changed = normalizeExcelBPSToolChoice(bodyReq)
+	require.True(t, changed)
+	require.Equal(t, `{"tool_choice":"auto"}`, string(out))
+
+	// 3. object tool_choice normalized to auto
+	bodyObj := []byte(`{"tool_choice":{"type":"function","function":{"name":"shell"}}}`)
+	out, changed = normalizeExcelBPSToolChoice(bodyObj)
+	require.True(t, changed)
+	require.Equal(t, `{"tool_choice":"auto"}`, string(out))
+}

@@ -175,16 +175,18 @@ func cleanStructuredJSON(raw string) (string, any, bool) {
 	}
 
 	// Strip Markdown code fences: ```json\n...\n``` or ```\n...\n```
-	if strings.HasPrefix(trimmed, "```") {
-		s := trimmed
-		if newlineIdx := strings.Index(s, "\n"); newlineIdx != -1 {
-			s = strings.TrimSpace(s[newlineIdx+1:])
-		}
-		if strings.HasSuffix(s, "```") {
-			s = strings.TrimSpace(strings.TrimSuffix(s, "```"))
-		}
-		if decode([]byte(s), &instance) == nil {
-			return s, instance, true
+	// Handles fences at the start or embedded within explanation text.
+	startFence := strings.Index(trimmed, "```")
+	if startFence != -1 {
+		rest := trimmed[startFence+3:]
+		if newlineIdx := strings.Index(rest, "\n"); newlineIdx != -1 {
+			inner := rest[newlineIdx+1:]
+			if endFence := strings.LastIndex(inner, "```"); endFence != -1 {
+				candidate := strings.TrimSpace(inner[:endFence])
+				if decode([]byte(candidate), &instance) == nil {
+					return candidate, instance, true
+				}
+			}
 		}
 	}
 

@@ -205,6 +205,7 @@ func (s *OpenAIGatewayService) forwardExcelBPS(ctx context.Context, c *gin.Conte
 	if sanitizedChanged {
 		logger.LegacyPrintf("service.openai_excel_bps", "sanitized encrypted_content from BPS request history: account_id=%d", account.ID)
 	}
+	body, _ = normalizeExcelBPSToolChoice(body)
 	if isOpenAIResponsesCompactPath(c) {
 		var request map[string]any
 		if err = json.Unmarshal(body, &request); err != nil {
@@ -790,6 +791,7 @@ func (s *OpenAIGatewayService) forwardExcelBPSAsChatCompletions(
 			return nil, err
 		}
 	}
+	body, _ = normalizeExcelBPSToolChoice(body)
 
 	scope := fmt.Sprintf("key:%d/thread:%s", getAPIKeyIDFromContext(c), identity)
 	imageSettings, err := s.settingService.GetExcelBPSImageRelaySettings(ctx)
@@ -1053,4 +1055,20 @@ func extractExcelBPS429WaitDuration(raw []byte, header http.Header) time.Duratio
 		}
 	}
 	return 0
+}
+
+func normalizeExcelBPSToolChoice(body []byte) ([]byte, bool) {
+	choice := gjson.GetBytes(body, "tool_choice")
+	if !choice.Exists() || choice.Type == gjson.Null {
+		return body, false
+	}
+	choiceStr := strings.TrimSpace(choice.String())
+	if choiceStr == "auto" || choiceStr == "none" {
+		return body, false
+	}
+	next, err := sjson.SetBytes(body, "tool_choice", "auto")
+	if err != nil {
+		return body, false
+	}
+	return next, true
 }

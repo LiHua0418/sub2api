@@ -198,13 +198,15 @@ func TestStructuredOutputInvalidAnswersNeverComplete(t *testing.T) {
 
 func TestStructuredJSONModeAndRefusals(t *testing.T) {
 	for answer, valid := range map[string]bool{
-		"{\"ok\":true}":               true,
-		"[1,2]":                       true,
-		"null":                        true,
-		"```json\n{\"ok\":true}\n```": true,
-		"```\n{\"ok\":true}\n```":     true,
-		"{\"ok\":true} {}":            false,
-		"not JSON":                    false,
+		"{\"ok\":true}":                                         true,
+		"[1,2]":                                                 true,
+		"null":                                                  true,
+		"```json\n{\"ok\":true}\n```":                           true,
+		"```\n{\"ok\":true}\n```":                               true,
+		"Here is the result:\n```json\n{\"ok\":true}\n```\nDone!": true,
+		"Note:\n```\n{\"ok\":true}\n```":                        true,
+		"{\"ok\":true} {}":                                      false,
+		"not JSON":                                              false,
 	} {
 		_, bridge := mustPrepare(t, testStructuredSource(object{"type": "json_object"}), "scope", nil)
 		events := structuredEvents(t, bridge, structuredTerminal("response.completed", structuredMessage(answer)))

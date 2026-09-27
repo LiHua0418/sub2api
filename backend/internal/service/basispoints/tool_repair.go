@@ -108,35 +108,53 @@ func (b *Bridge) translateCompleted(ctx context.Context, response object, repair
 		}
 		items, ok := repairableTools(corrected)
 		if !ok || len(items) != len(original) {
-			return fmt.Errorf("basispoints tool transport correction changed the tool batch; no tool was executed")
+			if !b.AllowUndeclaredTools {
+				return fmt.Errorf("basispoints tool transport correction changed the tool batch; no tool was executed")
+			}
 		}
 		validation = b.validateToolResponse(corrected)
 		if validation == nil {
-			items, err = b.restoreToolOperations(original, items)
-			if err != nil {
-				return err
-			}
-			outputItems := make([]any, len(items))
-			for i, item := range items {
-				outputItems[i] = item
-			}
-			combined := object{"output": outputItems}
-			if err := b.validateToolResponse(combined); err != nil {
-				return err
-			}
-			if !b.preservesToolOperations(original, items) {
-				return fmt.Errorf("basispoints tool transport correction changed an operation; no tool was executed")
-			}
-			// Text has already streamed. Replace only its withheld tool slots,
-			// keeping one downstream response identity and stable output indexes.
-			output, _ := response["output"].([]any)
-			next := 0
-			for i, raw := range output {
-				item, _ := raw.(object)
-				if isTool(item) {
-					output[i] = items[next]
-					next++
+			if !b.AllowUndeclaredTools {
+				items, err = b.restoreToolOperations(original, items)
+				if err != nil {
+					return err
 				}
+				outputItems := make([]any, len(items))
+				for i, item := range items {
+					outputItems[i] = item
+				}
+				combined := object{"output": outputItems}
+				if err := b.validateToolResponse(combined); err != nil {
+					return err
+				}
+				if !b.preservesToolOperations(original, items) {
+					return fmt.Errorf("basispoints tool transport correction changed an operation; no tool was executed")
+				}
+			}
+			// Text has already streamed. Replace its tool slots with the corrected items,
+			// keeping one downstream response identity.
+			output, _ := response["output"].([]any)
+			if len(items) == len(original) {
+				next := 0
+				for i, raw := range output {
+					item, _ := raw.(object)
+					if isTool(item) && next < len(items) {
+						output[i] = items[next]
+						next++
+					}
+				}
+			} else {
+				nonToolOutput := make([]any, 0, len(output)+len(items))
+				for _, raw := range output {
+					item, _ := raw.(object)
+					if !isTool(item) {
+						nonToolOutput = append(nonToolOutput, raw)
+					}
+				}
+				for _, item := range items {
+					nonToolOutput = append(nonToolOutput, item)
+				}
+				response["output"] = nonToolOutput
 			}
 			return b.translateResponse(response)
 		}
