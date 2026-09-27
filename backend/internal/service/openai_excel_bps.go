@@ -196,6 +196,14 @@ func (s *OpenAIGatewayService) forwardExcelBPS(ctx context.Context, c *gin.Conte
 			return nil, err
 		}
 	}
+	var sanitizedChanged bool
+	body, sanitizedChanged, err = sanitizeExcelBPSEncryptedContent(body)
+	if err != nil {
+		return fail(400, "basispoints_request_invalid", err.Error())
+	}
+	if sanitizedChanged {
+		logger.LegacyPrintf("service.openai_excel_bps", "sanitized encrypted_content from BPS request history: account_id=%d", account.ID)
+	}
 	if isOpenAIResponsesCompactPath(c) {
 		var request map[string]any
 		if err = json.Unmarshal(body, &request); err != nil {

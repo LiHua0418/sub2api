@@ -20,6 +20,42 @@ import (
 const excelBPSInvalidCiphertext = `{"error":{"code":"invalid_encrypted_content","message":"private upstream diagnostic"}}`
 const excelBPSInvalidCiphertextNoCode = `{"error":{"message":"The encrypted content fixture...end could not be verified. Reason: Encrypted content could not be decrypted or parsed."}}`
 
+func TestSanitizeExcelBPSEncryptedContent(t *testing.T) {
+	// Case 1: user message with encrypted_content at content[1] (exact replica of input[229].content[1] issue)
+	body := []byte(`{
+		"model": "gpt-5.6-sol",
+		"input": [
+			{"role": "user", "content": [{"type": "input_text", "text": "user prompt"}, {"type": "encrypted_content", "encrypted_content": "opaque123"}]},
+			{"role": "assistant", "content": [{"type": "output_text", "text": "assistant reply"}, {"type": "encrypted_content", "encrypted_content": "reasoningBlob"}]},
+			{"type": "function_call_output", "output": [{"type": "output_text", "text": "tool output"}, {"type": "encrypted_content", "data": "outputCiphertext"}]}
+		]
+	}`)
+	sanitized, changed, err := sanitizeExcelBPSEncryptedContent(body)
+	require.NoError(t, err)
+	require.True(t, changed)
+
+	// Check that encrypted_content parts in content and output are completely gone
+	require.False(t, strings.Contains(string(sanitized), `"type":"encrypted_content"`))
+	require.False(t, strings.Contains(string(sanitized), `opaque123`))
+	require.False(t, strings.Contains(string(sanitized), `outputCiphertext`))
+
+	// Check that user prompt and assistant text are preserved
+	require.True(t, strings.Contains(string(sanitized), `user prompt`))
+	require.True(t, strings.Contains(string(sanitized), `assistant reply`))
+	require.True(t, strings.Contains(string(sanitized), `tool output`))
+
+	// Check that assistant reasoning was lifted to top-level reasoning item
+	require.True(t, strings.Contains(string(sanitized), `"type":"reasoning"`))
+	require.True(t, strings.Contains(string(sanitized), `reasoningBlob`))
+
+	// Case 2: Clean body without encrypted_content returns changed=false
+	cleanBody := []byte(`{"model":"gpt-5.6-sol","input":[{"role":"user","content":[{"type":"input_text","text":"hello"}]}]}`)
+	sameBody, changed, err := sanitizeExcelBPSEncryptedContent(cleanBody)
+	require.NoError(t, err)
+	require.False(t, changed)
+	require.Equal(t, cleanBody, sameBody)
+}
+
 func TestExcelBPSInvalidEncryptedContentClassification(t *testing.T) {
 	for _, tc := range []struct {
 		name, raw string
