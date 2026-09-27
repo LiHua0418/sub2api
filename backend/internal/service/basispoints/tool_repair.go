@@ -85,7 +85,7 @@ func (b *Bridge) translateCompleted(ctx context.Context, response object, repair
 	}
 	for _, item := range original {
 		if target := transportTarget(transportArguments(item)); target != "" {
-			if _, allowed := b.tools[target]; !allowed {
+			if _, allowed := b.lookupTool(target); !allowed {
 				return validation
 			}
 		}
@@ -222,7 +222,7 @@ func (b *Bridge) preservesToolOperations(original, corrected []object) bool {
 		}
 		args := transportArguments(native)
 		if target := transportTarget(args); target != "" {
-			info, allowed := b.tools[target]
+			info, allowed := b.lookupTool(target)
 			if !allowed || after["name"] != info.Name || text(after["namespace"]) != info.Namespace {
 				return false
 			}
@@ -246,7 +246,7 @@ func (b *Bridge) preservesToolOperations(original, corrected []object) bool {
 				return false
 			}
 			toolName := text(after["name"])
-			if info, ok := b.tools[toolName]; ok && supportsFunctionCodeTransport(toolName, info.Kind, info.Parameters) {
+			if info, ok := b.lookupTool(toolName); ok && supportsFunctionCodeTransport(toolName, info.Kind, info.Parameters) {
 				if payload["code"] != code {
 					return false
 				}

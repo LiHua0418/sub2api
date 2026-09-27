@@ -364,14 +364,14 @@ func (b *Bridge) rebuildNativeHistoryCall(item object) (object, error) {
 	// Rebuilt calls are examples for subsequent model turns. Use the same raw
 	// transport advertised by today's catalog instead of teaching CUSTOM tools
 	// to use the ordinary FUNCTION envelope. Cached native calls stay verbatim.
-	if info, ok := b.tools[name]; ok && info.Kind == "custom" && text(item["type"]) == "custom_tool_call" {
+	if info, ok := b.lookupTool(name); ok && info.Kind == "custom" && text(item["type"]) == "custom_tool_call" {
 		outer["summary"] = customTransportPrefix + name
 		outer["code"] = envelope["input"]
 		if _, _, err := customTransportEnvelope(outer); err != nil {
 			return nil, err
 		}
 	}
-	if info, ok := b.tools[name]; ok && text(item["type"]) == "function_call" && supportsFunctionCodeTransport(name, info.Kind, info.Parameters) {
+	if info, ok := b.lookupTool(name); ok && text(item["type"]) == "function_call" && supportsFunctionCodeTransport(name, info.Kind, info.Parameters) {
 		args, _ := envelope["arguments"].(object)
 		if _, hasCode := args["code"].(string); hasCode {
 			outer, err = encodeFunctionCodeTransport(name, args)
@@ -380,7 +380,7 @@ func (b *Bridge) rebuildNativeHistoryCall(item object) (object, error) {
 			}
 		}
 	}
-	if info, ok := b.tools[name]; ok && text(item["type"]) == "function_call" && supportsFunctionCmdTransport(name, info.Kind, info.Parameters) {
+	if info, ok := b.lookupTool(name); ok && text(item["type"]) == "function_call" && supportsFunctionCmdTransport(name, info.Kind, info.Parameters) {
 		args, _ := envelope["arguments"].(object)
 		if _, hasCmd := args["cmd"].(string); hasCmd {
 			outer, err = encodeFunctionCmdTransport(name, args)
@@ -626,6 +626,23 @@ func (b *Bridge) lookupTool(name string) (tool, bool) {
 			trimmed := strings.TrimPrefix(lower, prefix)
 			for k, info := range b.tools {
 				if strings.ToLower(k) == trimmed {
+					return info, true
+				}
+			}
+		}
+	}
+	// 6. Hyphen and underscore normalization (e.g. "my_tool" vs "my-tool")
+	normName := strings.ReplaceAll(lower, "-", "_")
+	for k, info := range b.tools {
+		if strings.ReplaceAll(strings.ToLower(k), "-", "_") == normName {
+			return info, true
+		}
+	}
+	for _, prefix := range []string{"functions.", "tools.", "client."} {
+		if strings.HasPrefix(normName, prefix) {
+			trimmed := strings.TrimPrefix(normName, prefix)
+			for k, info := range b.tools {
+				if strings.ReplaceAll(strings.ToLower(k), "-", "_") == trimmed {
 					return info, true
 				}
 			}

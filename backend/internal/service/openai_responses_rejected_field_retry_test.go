@@ -430,6 +430,14 @@ func TestNormalizeOpenAIResponsesRejectedFieldRetryBodyRemovesModelRejectedPromp
 			reason:       "prompt_cache_breakpoint parameter rejection",
 		},
 		{
+			name:         "all breakpoints stripped on model rejection",
+			body:         []byte(`{"input":[{"type":"message","prompt_cache_breakpoint":{"type":"message_start"}},{"type":"message","prompt_cache_breakpoint":{"type":"message_end"}}]}`),
+			responseBody: []byte(`{"error":{"code":"invalid_parameter","message":"prompt_cache_breakpoint is not supported on this model","param":"prompt_cache_breakpoint"}}`),
+			removedPath:  "input.1.prompt_cache_breakpoint",
+			preserved:    "input.0.type",
+			reason:       "prompt_cache_breakpoint parameter rejection",
+		},
+		{
 			name:         "indexed path from message",
 			body:         []byte(`{"input":[{"type":"message","prompt_cache_breakpoint":{"type":"message_start"}},{"type":"message","prompt_cache_breakpoint":{"type":"message_end"}}]}`),
 			responseBody: []byte(`{"error":{"code":"invalid_parameter","message":"input[1].prompt_cache_breakpoint is not supported on this model"}}`),

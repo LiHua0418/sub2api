@@ -222,6 +222,13 @@ func envelopeName(envelope object) (string, error) {
 	if name == "" {
 		name = alias
 	}
+	if name == "" {
+		if fn, ok := envelope["function"].(map[string]any); ok {
+			name = text(fn["name"])
+		} else if fn, ok := envelope["call"].(map[string]any); ok {
+			name = text(fn["name"])
+		}
+	}
 	return name, nil
 }
 
@@ -233,6 +240,19 @@ func envelopeArguments(envelope object) (any, error) {
 	}
 	if !exists {
 		args = alias
+	}
+	if args == nil {
+		if fn, ok := envelope["function"].(map[string]any); ok {
+			args = fn["arguments"]
+			if args == nil {
+				args = fn["args"]
+			}
+		} else if fn, ok := envelope["call"].(map[string]any); ok {
+			args = fn["arguments"]
+			if args == nil {
+				args = fn["args"]
+			}
+		}
 	}
 	return args, nil
 }

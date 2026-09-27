@@ -310,6 +310,9 @@ func applyCodexOAuthTransformWithOptions(reqBody map[string]any, opts codexOAuth
 	if isCodexSparkModel(normalizedModel) && stripCodexSparkImageGenerationTools(reqBody) {
 		result.Modified = true
 	}
+	if strings.HasPrefix(normalizedModel, "gpt-6-sol") && stripCodexPromptCacheBreakpoints(reqBody) {
+		result.Modified = true
+	}
 
 	// 续链场景保留 item_reference 与 id，避免 call_id 上下文丢失。
 	if input, ok := reqBody["input"].([]any); ok {
@@ -858,6 +861,46 @@ func stripOpenAIImageGenerationToolsFromRawPayload(payload []byte) ([]byte, bool
 // advertise them by default.
 func stripCodexSparkImageGenerationTools(reqBody map[string]any) bool {
 	return stripOpenAIImageGenerationTools(reqBody)
+}
+
+func stripCodexPromptCacheBreakpoints(reqBody map[string]any) bool {
+	if reqBody == nil {
+		return false
+	}
+	modified := false
+	if _, ok := reqBody["prompt_cache_breakpoint"]; ok {
+		delete(reqBody, "prompt_cache_breakpoint")
+		modified = true
+	}
+	input, ok := reqBody["input"].([]any)
+	if !ok {
+		return modified
+	}
+	for _, rawItem := range input {
+		item, ok := rawItem.(map[string]any)
+		if !ok {
+			continue
+		}
+		if _, ok := item["prompt_cache_breakpoint"]; ok {
+			delete(item, "prompt_cache_breakpoint")
+			modified = true
+		}
+		content, ok := item["content"].([]any)
+		if !ok {
+			continue
+		}
+		for _, rawPart := range content {
+			part, ok := rawPart.(map[string]any)
+			if !ok {
+				continue
+			}
+			if _, ok := part["prompt_cache_breakpoint"]; ok {
+				delete(part, "prompt_cache_breakpoint")
+				modified = true
+			}
+		}
+	}
+	return modified
 }
 
 func hasOpenAIInputImage(reqBody map[string]any) bool {

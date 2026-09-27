@@ -138,12 +138,12 @@ func normalizeOpenAIResponsesRejectedFieldRetryBody(statusCode int, body, respon
 	cacheParamMatchesMessage := cacheMessageParam == "" || cacheParam == cacheMessageParam
 	cacheModelRejection := code == "invalid_parameter" || cacheMessageParam != ""
 	if cacheParam != "" && cacheParamMatchesMessage && cacheModelRejection {
-		if cacheParam == "prompt_cache_breakpoint" && gjson.GetBytes(body, cacheParam).Exists() {
-			retryBody, err := sjson.DeleteBytes(body, cacheParam)
-			if err != nil {
-				return nil, "", false, fmt.Errorf("delete rejected prompt_cache_breakpoint: %w", err)
+		if cacheParam == "prompt_cache_breakpoint" || strings.Contains(strings.ToLower(message), "prompt_cache_breakpoint") {
+			if retryBody, changed, err := stripAllPromptCacheBreakpoints(body); err != nil {
+				return nil, "", false, err
+			} else if changed {
+				return retryBody, "prompt_cache_breakpoint parameter rejection", true, nil
 			}
-			return retryBody, "prompt_cache_breakpoint parameter rejection", true, nil
 		}
 		if index, ok := openAIResponsesRejectedCacheIndex(cacheParam); ok {
 			return removeOpenAIResponsesRejectedCacheAtIndex(body, index)
@@ -339,6 +339,48 @@ func removeOpenAIResponsesRejectedCacheAtIndex(body []byte, index int) ([]byte, 
 		return nil, "", false, fmt.Errorf("delete rejected prompt_cache_breakpoint at input[%d]: %w", index, err)
 	}
 	return retryBody, "indexed prompt_cache_breakpoint parameter rejection", true, nil
+}
+
+func stripAllPromptCacheBreakpoints(body []byte) ([]byte, bool, error) {
+	changed := false
+	current := body
+	if gjson.GetBytes(current, "prompt_cache_breakpoint").Exists() {
+		next, err := sjson.DeleteBytes(current, "prompt_cache_breakpoint")
+		if err != nil {
+			return nil, false, fmt.Errorf("delete rejected top-level prompt_cache_breakpoint: %w", err)
+		}
+		current = next
+		changed = true
+	}
+	input := gjson.GetBytes(current, "input")
+	if input.IsArray() {
+		for i, item := range input.Array() {
+			if item.Get("prompt_cache_breakpoint").Exists() {
+				path := fmt.Sprintf("input.%d.prompt_cache_breakpoint", i)
+				next, err := sjson.DeleteBytes(current, path)
+				if err != nil {
+					return nil, false, fmt.Errorf("delete rejected prompt_cache_breakpoint at input[%d]: %w", i, err)
+				}
+				current = next
+				changed = true
+			}
+			content := item.Get("content")
+			if content.IsArray() {
+				for j, part := range content.Array() {
+					if part.Get("prompt_cache_breakpoint").Exists() {
+						path := fmt.Sprintf("input.%d.content.%d.prompt_cache_breakpoint", i, j)
+						next, err := sjson.DeleteBytes(current, path)
+						if err != nil {
+							return nil, false, fmt.Errorf("delete rejected prompt_cache_breakpoint at input[%d].content[%d]: %w", i, j, err)
+						}
+						current = next
+						changed = true
+					}
+				}
+			}
+		}
+	}
+	return current, changed, nil
 }
 
 func normalizeOpenAIResponsesRejectedNullContentAtIndex(body []byte, index int) ([]byte, string, bool, error) {
