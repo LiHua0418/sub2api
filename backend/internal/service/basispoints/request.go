@@ -30,6 +30,7 @@ type Bridge struct {
 	hasToolHistory   bool
 	disallowParallel bool
 	AllowUndeclaredTools bool
+	AllowLenientToolSchema bool
 }
 
 func decode(raw []byte, target any) error {

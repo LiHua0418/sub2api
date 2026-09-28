@@ -124,3 +124,47 @@ func TestAllowUndeclaredToolsSynthesizesClientFunctionCall(t *testing.T) {
 		t.Fatalf("unexpected synthesized call: %+v", call)
 	}
 }
+
+// When AllowLenientToolSchema is enabled, arguments that don't strictly satisfy the
+// client's declared JSON schema are relayed to the client rather than failing with 502.
+func TestAllowLenientToolSchemaRelaysImperfectArguments(t *testing.T) {
+	cache := new(ReplayCache)
+	source := testSource()
+	source["tools"] = []any{object{
+		"type": "function",
+		"name": "search_data",
+		"parameters": object{
+			"type": "object",
+			"properties": object{
+				"query": object{"type": "string"},
+			},
+			"required":             []any{"query"},
+			"additionalProperties": false,
+		},
+	}}
+	_, bridge := mustPrepare(t, source, "scope", cache)
+
+	// An extra property violates the strict schema
+	native := object{
+		"type":      "function_call",
+		"id":        "fc_search",
+		"call_id":   "call_search",
+		"name":      "search_data",
+		"arguments": `{"query":"test","extra_unexpected_field":true}`,
+	}
+
+	// 1. Without AllowLenientToolSchema, it must fail schema validation
+	if _, err := bridge.translateCall(native); err == nil {
+		t.Fatal("expected error when AllowLenientToolSchema is false")
+	}
+
+	// 2. With AllowLenientToolSchema, it must relay cleanly
+	bridge.AllowLenientToolSchema = true
+	call, err := bridge.translateCall(native)
+	if err != nil {
+		t.Fatalf("unexpected error when AllowLenientToolSchema is true: %v", err)
+	}
+	if call["name"] != "search_data" {
+		t.Fatalf("unexpected call: %+v", call)
+	}
+}

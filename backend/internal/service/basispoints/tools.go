@@ -775,8 +775,8 @@ func (b *Bridge) finishClientToolCall(native object, info tool, envelope object,
 			}
 		}
 		// FUNCTION_CMD preserves client-validated metadata verbatim. Ordinary
-		// function envelopes still enforce their complete declared schema.
-		if validateSchema && info.Schema != nil && info.Schema.Validate(args) != nil {
+		// function envelopes enforce their complete declared schema unless AllowLenientToolSchema is enabled.
+		if !b.AllowLenientToolSchema && validateSchema && info.Schema != nil && info.Schema.Validate(args) != nil {
 			return nil, toolArgumentsSchemaError{}
 		}
 		encoded, _ := json.Marshal(args)

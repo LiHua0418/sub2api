@@ -195,6 +195,7 @@ func (b *Bridge) Reprepare(raw []byte) ([]byte, *Bridge, error) {
 	body, nextBridge, err := prepare(encoded, b.scope, b.replay, b.nativeToolImages)
 	if err == nil && nextBridge != nil {
 		nextBridge.AllowUndeclaredTools = b.AllowUndeclaredTools
+		nextBridge.AllowLenientToolSchema = b.AllowLenientToolSchema
 	}
 	return body, nextBridge, err
 }

@@ -284,6 +284,7 @@ func (s *OpenAIGatewayService) forwardExcelBPS(ctx context.Context, c *gin.Conte
 	}
 	if bridge != nil {
 		bridge.AllowUndeclaredTools = true
+		bridge.AllowLenientToolSchema = true
 	}
 	token, _, err := s.GetAccessToken(ctx, account)
 	if err != nil {
@@ -342,6 +343,7 @@ func (s *OpenAIGatewayService) forwardExcelBPS(ctx context.Context, c *gin.Conte
 		}
 		if bridge != nil {
 			bridge.AllowUndeclaredTools = true
+			bridge.AllowLenientToolSchema = true
 		}
 	}
 	requestCtx := WithHTTPUpstreamRedirectsDisabled(WithHTTPUpstreamProfile(ctx, HTTPUpstreamProfileLongStream))
@@ -830,6 +832,7 @@ func (s *OpenAIGatewayService) forwardExcelBPSAsChatCompletions(
 	}
 	if bridge != nil {
 		bridge.AllowUndeclaredTools = true
+		bridge.AllowLenientToolSchema = true
 	}
 
 	token, _, err := s.GetAccessToken(ctx, account)
@@ -876,6 +879,7 @@ func (s *OpenAIGatewayService) forwardExcelBPSAsChatCompletions(
 		}
 		if bridge != nil {
 			bridge.AllowUndeclaredTools = true
+			bridge.AllowLenientToolSchema = true
 		}
 	}
 
