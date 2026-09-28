@@ -2437,17 +2437,93 @@ func openAIImageRateLimitResetAt(headers http.Header, body []byte) time.Time {
 	return now.Add(openAIImageRateLimitDefaultCooldown)
 }
 
+func getHeaderCaseInsensitive(headers http.Header, key string) string {
+	if headers == nil {
+		return ""
+	}
+	if v := headers.Get(key); v != "" {
+		return v
+	}
+	lowerKey := strings.ToLower(key)
+	for k, vv := range headers {
+		if strings.ToLower(k) == lowerKey && len(vv) > 0 {
+			return vv[0]
+		}
+	}
+	return ""
+}
+
+// parseRetryAfterDuration extracts the retry delay duration from headers,
+// prioritizing millisecond-level precision (retry-after-ms, x-ratelimit-reset-tokens, x-ratelimit-reset-requests)
+// before falling back to standard seconds in Retry-After.
+func parseRetryAfterDuration(headers http.Header) time.Duration {
+	if headers == nil {
+		return 0
+	}
+	if msStr := strings.TrimSpace(getHeaderCaseInsensitive(headers, "retry-after-ms")); msStr != "" {
+		if ms, err := strconv.ParseFloat(msStr, 64); err == nil && ms > 0 {
+			return time.Duration(ms * float64(time.Millisecond))
+		}
+	}
+	if resetStr := strings.TrimSpace(getHeaderCaseInsensitive(headers, "x-ratelimit-reset-tokens")); resetStr != "" {
+		if d, err := time.ParseDuration(resetStr); err == nil && d > 0 {
+			return d
+		}
+	}
+	if resetStr := strings.TrimSpace(getHeaderCaseInsensitive(headers, "x-ratelimit-reset-requests")); resetStr != "" {
+		if d, err := time.ParseDuration(resetStr); err == nil && d > 0 {
+			return d
+		}
+	}
+	raw := strings.TrimSpace(getHeaderCaseInsensitive(headers, "Retry-After"))
+	if raw == "" {
+		return 0
+	}
+	if seconds, err := strconv.ParseFloat(raw, 64); err == nil && seconds > 0 {
+		return time.Duration(seconds * float64(time.Second))
+	}
+	return 0
+}
+
+func parseRetryAfterDurationFromHeadersOrBody(headers http.Header, body []byte) time.Duration {
+	if d := parseRetryAfterDuration(headers); d > 0 {
+		return d
+	}
+	if len(body) > 0 {
+		if gjson.ValidBytes(body) {
+			for _, path := range []string{"error.headers.retry-after-ms", "headers.retry-after-ms"} {
+				if v := gjson.GetBytes(body, path); v.Exists() {
+					if ms := v.Float(); ms > 0 {
+						return time.Duration(ms * float64(time.Millisecond))
+					}
+				}
+			}
+			for _, path := range []string{"error.headers.x-ratelimit-reset-tokens", "headers.x-ratelimit-reset-tokens"} {
+				if v := gjson.GetBytes(body, path); v.Exists() {
+					if d, err := time.ParseDuration(v.String()); err == nil && d > 0 {
+						return d
+					}
+				}
+			}
+		}
+		if d := parseOpenAIImageTryAgainCooldown(body); d > 0 {
+			return d
+		}
+	}
+	return 0
+}
+
 func parseRetryAfterResetTime(headers http.Header, now time.Time) *time.Time {
 	if headers == nil {
 		return nil
 	}
+	if d := parseRetryAfterDuration(headers); d > 0 {
+		resetAt := now.Add(d)
+		return &resetAt
+	}
 	raw := strings.TrimSpace(headers.Get("Retry-After"))
 	if raw == "" {
 		return nil
-	}
-	if seconds, err := strconv.ParseFloat(raw, 64); err == nil {
-		resetAt := now.Add(time.Duration(seconds * float64(time.Second)))
-		return &resetAt
 	}
 	if parsed, err := http.ParseTime(raw); err == nil {
 		return &parsed

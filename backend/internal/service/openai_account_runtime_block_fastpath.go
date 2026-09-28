@@ -309,10 +309,16 @@ func (s *OpenAIGatewayService) openAIOAuth429RetryDeadline(account *Account) tim
 	return startedAt.Add(openAIOAuth429RetryWindow)
 }
 
-func openAIOAuth429SameAccountRetryDelay(headers http.Header, deadline time.Time) time.Duration {
+func openAIOAuth429SameAccountRetryDelay(headers http.Header, deadline time.Time, body ...[]byte) time.Duration {
 	delay := openAIOAuth429RetryDelay
 	now := time.Now()
-	if resetAt := parseRetryAfterResetTime(headers, now); resetAt != nil && resetAt.After(now) {
+	var rawBody []byte
+	if len(body) > 0 {
+		rawBody = body[0]
+	}
+	if d := parseRetryAfterDurationFromHeadersOrBody(headers, rawBody); d > 0 {
+		delay = d
+	} else if resetAt := parseRetryAfterResetTime(headers, now); resetAt != nil && resetAt.After(now) {
 		delay = resetAt.Sub(now)
 	}
 	if delay > openAIOAuth429MaxRetryDelay {

@@ -32,6 +32,21 @@ func TestExtractExcelBPS429WaitDuration(t *testing.T) {
 	// Case 6: Generic 429 without wait duration
 	msgGeneric := []byte(`{"error": {"message": "Rate limit exceeded", "type": "requests"}}`)
 	require.Equal(t, time.Duration(0), extractExcelBPS429WaitDuration(msgGeneric, nil))
+
+	// Case 7: retry-after-ms header takes precedence over Retry-After
+	headerMS := http.Header{}
+	headerMS.Set("Retry-After", "1")
+	headerMS.Set("retry-after-ms", "69")
+	require.Equal(t, 69*time.Millisecond, extractExcelBPS429WaitDuration(msgMS, headerMS))
+
+	// Case 8: x-ratelimit-reset-tokens header
+	headerTokens := http.Header{}
+	headerTokens.Set("x-ratelimit-reset-tokens", "85ms")
+	require.Equal(t, 85*time.Millisecond, extractExcelBPS429WaitDuration(nil, headerTokens))
+
+	// Case 9: JSON body with embedded retry-after-ms
+	jsonBody := []byte(`{"error":{"code":"rate_limit_exceeded","headers":{"retry-after-ms":"157"}}}`)
+	require.Equal(t, 157*time.Millisecond, extractExcelBPS429WaitDuration(jsonBody, nil))
 }
 
 func TestNormalizeExcelBPSToolChoice(t *testing.T) {

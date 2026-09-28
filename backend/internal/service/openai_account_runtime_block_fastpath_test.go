@@ -365,6 +365,18 @@ func TestOpenAI429RetryDelayHonorsBoundedRetryAfter(t *testing.T) {
 	deadline := time.Now().Add(openAIOAuth429RetryWindow)
 	require.Equal(t, openAIOAuth429RetryDelay, openAIOAuth429SameAccountRetryDelay(nil, deadline))
 	require.Equal(t, openAIOAuth429MaxRetryDelay, openAIOAuth429SameAccountRetryDelay(http.Header{"Retry-After": []string{"90"}}, deadline))
+
+	// Exact millisecond header parsing
+	require.Equal(t, 69*time.Millisecond, openAIOAuth429SameAccountRetryDelay(http.Header{"retry-after-ms": []string{"69"}}, deadline))
+	require.Equal(t, 69*time.Millisecond, openAIOAuth429SameAccountRetryDelay(http.Header{
+		"Retry-After":    []string{"1"},
+		"retry-after-ms": []string{"69"},
+	}, deadline))
+	require.Equal(t, 120*time.Millisecond, openAIOAuth429SameAccountRetryDelay(http.Header{"x-ratelimit-reset-tokens": []string{"120ms"}}, deadline))
+
+	// Body regex parsing when headers are missing
+	body := []byte(`Rate limit reached for gpt-6-sol on tokens per min (TPM): Limit 40000000. Please try again in 75ms.`)
+	require.Equal(t, 75*time.Millisecond, openAIOAuth429SameAccountRetryDelay(nil, deadline, body))
 }
 
 func TestOpenAI429FastPath_OpenCodeGoUsageLimitUsesMessageResetDuration(t *testing.T) {

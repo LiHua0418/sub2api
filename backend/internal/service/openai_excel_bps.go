@@ -1036,24 +1036,54 @@ var (
 
 func extractExcelBPS429WaitDuration(raw []byte, header http.Header) time.Duration {
 	if header != nil {
-		if retryAfter := strings.TrimSpace(header.Get("Retry-After")); retryAfter != "" {
+		if msStr := strings.TrimSpace(getHeaderCaseInsensitive(header, "retry-after-ms")); msStr != "" {
+			if ms, err := strconv.ParseFloat(msStr, 64); err == nil && ms > 0 {
+				return time.Duration(ms * float64(time.Millisecond))
+			}
+		}
+		if resetStr := strings.TrimSpace(getHeaderCaseInsensitive(header, "x-ratelimit-reset-tokens")); resetStr != "" {
+			if d, err := time.ParseDuration(resetStr); err == nil && d > 0 {
+				return d
+			}
+		}
+		if resetStr := strings.TrimSpace(getHeaderCaseInsensitive(header, "x-ratelimit-reset-requests")); resetStr != "" {
+			if d, err := time.ParseDuration(resetStr); err == nil && d > 0 {
+				return d
+			}
+		}
+		if retryAfter := strings.TrimSpace(getHeaderCaseInsensitive(header, "Retry-After")); retryAfter != "" {
 			if seconds, err := strconv.Atoi(retryAfter); err == nil && seconds > 0 {
 				return time.Duration(seconds) * time.Second
 			}
 		}
 	}
-	if len(raw) == 0 {
-		return 0
-	}
-	msg := string(raw)
-	if m := reExcelBPSWaitMS.FindStringSubmatch(msg); len(m) > 1 {
-		if ms, err := strconv.ParseFloat(m[1], 64); err == nil && ms > 0 {
-			return time.Duration(ms * float64(time.Millisecond))
+	if len(raw) > 0 {
+		if gjson.ValidBytes(raw) {
+			for _, path := range []string{"error.headers.retry-after-ms", "headers.retry-after-ms"} {
+				if v := gjson.GetBytes(raw, path); v.Exists() {
+					if ms := v.Float(); ms > 0 {
+						return time.Duration(ms * float64(time.Millisecond))
+					}
+				}
+			}
+			for _, path := range []string{"error.headers.x-ratelimit-reset-tokens", "headers.x-ratelimit-reset-tokens"} {
+				if v := gjson.GetBytes(raw, path); v.Exists() {
+					if d, err := time.ParseDuration(v.String()); err == nil && d > 0 {
+						return d
+					}
+				}
+			}
 		}
-	}
-	if m := reExcelBPSWaitS.FindStringSubmatch(msg); len(m) > 1 {
-		if s, err := strconv.ParseFloat(m[1], 64); err == nil && s > 0 {
-			return time.Duration(s * float64(time.Second))
+		msg := string(raw)
+		if m := reExcelBPSWaitMS.FindStringSubmatch(msg); len(m) > 1 {
+			if ms, err := strconv.ParseFloat(m[1], 64); err == nil && ms > 0 {
+				return time.Duration(ms * float64(time.Millisecond))
+			}
+		}
+		if m := reExcelBPSWaitS.FindStringSubmatch(msg); len(m) > 1 {
+			if s, err := strconv.ParseFloat(m[1], 64); err == nil && s > 0 {
+				return time.Duration(s * float64(time.Second))
+			}
 		}
 	}
 	return 0
