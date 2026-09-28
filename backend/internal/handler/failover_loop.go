@@ -35,7 +35,7 @@ const (
 	// 生产调用方通常传入账号级配置 account.GetPoolModeRetryCount()，该常量仅作兜底/测试默认值。
 	maxSameAccountRetries = 3
 	// sameAccountRetryDelay 同账号重试间隔
-	sameAccountRetryDelay = 500 * time.Millisecond
+	sameAccountRetryDelay = 200 * time.Millisecond
 	// maxRequestScopedRetryDelay 限制请求级瞬时错误的指数退避上限，避免高重试配置
 	// 将单次请求拖入分钟级等待。
 	maxRequestScopedRetryDelay = 8 * time.Second

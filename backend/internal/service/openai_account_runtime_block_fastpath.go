@@ -13,7 +13,7 @@ const (
 	openAIAccountStateUpdateTimeout       = 5 * time.Second
 	openAIOAuth429FallbackCooldown        = 5 * time.Second
 	openAIOAuth429RetryWindow             = 2 * time.Minute
-	openAIOAuth429RetryDelay              = 500 * time.Millisecond
+	openAIOAuth429RetryDelay              = 200 * time.Millisecond
 	openAIOAuth429MaxRetryDelay           = 8 * time.Second
 	openAIOAuth429MaxAccountAttempts      = 3
 	openAIStopSchedulingBridgeCooldown    = 2 * time.Minute
