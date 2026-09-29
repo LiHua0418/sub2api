@@ -1,6 +1,7 @@
 package service
 
 import (
+	"github.com/Wei-Shaw/sub2api/internal/pkg/apicompat"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 )
@@ -20,8 +21,11 @@ func excelBPSDownstreamUsage(payload []byte) ([]byte, error) {
 		for _, field := range []string{
 			"input_tokens_details.cache_write_tokens", "prompt_tokens_details.cache_write_tokens",
 			"input_tokens_details.cache_creation_tokens", "prompt_tokens_details.cache_creation_tokens",
+			"input_tokens_details.cached_creation_tokens", "prompt_tokens_details.cached_creation_tokens",
 			"cache_write_tokens", "cache_creation_input_tokens", "cache_write_input_tokens", "cache_creation_tokens",
+			"cached_creation_tokens",
 			"cache_creation.ephemeral_5m_input_tokens", "cache_creation.ephemeral_1h_input_tokens",
+			"claude_cache_creation_5_m_tokens", "claude_cache_creation_1_h_tokens",
 		} {
 			if value := usage.Get(field); !value.Exists() || value.Raw == "0" {
 				continue
@@ -43,3 +47,25 @@ func excelBPSDownstreamUsage(payload []byte) ([]byte, error) {
 	}
 	return payload, nil
 }
+
+func clearResponsesUsageCacheCreation(u *apicompat.ResponsesUsage) {
+	if u == nil {
+		return
+	}
+	u.CacheCreationInputTokens = 0
+	if u.InputTokensDetails != nil {
+		u.InputTokensDetails.CacheCreationTokens = 0
+		u.InputTokensDetails.CacheWriteTokens = 0
+	}
+}
+
+func clearChatUsageCacheCreation(u *apicompat.ChatUsage) {
+	if u == nil {
+		return
+	}
+	if u.PromptTokensDetails != nil {
+		u.PromptTokensDetails.CacheCreationTokens = 0
+		u.PromptTokensDetails.CacheWriteTokens = 0
+	}
+}
+

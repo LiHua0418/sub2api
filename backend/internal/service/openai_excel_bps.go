@@ -612,6 +612,9 @@ func (s *OpenAIGatewayService) forwardExcelBPS(ctx context.Context, c *gin.Conte
 	var completed []byte
 	terminal := ""
 	cacheCreationAsInput := account.IsExcelBPSCacheCreationAsInputEnabled() || s.isExcelBPSCacheCreationAsInputGloballyEnabled(ctx)
+	if c != nil && cacheCreationAsInput {
+		c.Set("excel_bps_cache_creation_as_input", true)
+	}
 	for scanner.Next(ctx, 0, heartbeat.C, keepalive) {
 		line := scanner.Text()
 		kind := ""
@@ -808,6 +811,11 @@ func (s *OpenAIGatewayService) forwardExcelBPSAsChatCompletions(
 	fail := func(status int, errType, message string) (*OpenAIForwardResult, error) {
 		writeChatCompletionsError(c, status, errType, message)
 		return nil, errors.New(message)
+	}
+
+	cacheCreationAsInput := account.IsExcelBPSCacheCreationAsInputEnabled() || s.isExcelBPSCacheCreationAsInputGloballyEnabled(ctx)
+	if c != nil && cacheCreationAsInput {
+		c.Set("excel_bps_cache_creation_as_input", true)
 	}
 
 	model := account.GetMappedModel(billingModel)

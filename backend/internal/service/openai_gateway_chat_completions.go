@@ -633,6 +633,9 @@ func (s *OpenAIGatewayService) handleChatBufferedStreamingResponse(
 	acc.SupplementResponseOutput(finalResponse)
 
 	chatResp := apicompat.ResponsesToChatCompletions(finalResponse, originalModel)
+	if c != nil && c.GetBool("excel_bps_cache_creation_as_input") {
+		clearChatUsageCacheCreation(chatResp.Usage)
+	}
 
 	if s.responseHeaderFilter != nil {
 		responseheaders.WriteFilteredHeaders(c.Writer.Header(), resp.Header, s.responseHeaderFilter)
@@ -822,6 +825,12 @@ func (s *OpenAIGatewayService) handleChatStreamingResponse(
 				usage = copyOpenAIUsageFromResponsesUsage(event.Response.Usage)
 			}
 		}
+		if c != nil && c.GetBool("excel_bps_cache_creation_as_input") {
+			clearResponsesUsageCacheCreation(event.Usage)
+			if event.Response != nil {
+				clearResponsesUsageCacheCreation(event.Response.Usage)
+			}
+		}
 		if strings.TrimSpace(event.Type) == "response.failed" || strings.TrimSpace(event.Type) == "error" {
 			payloadBytes := []byte(payload)
 			message := extractOpenAISSEErrorMessage(payloadBytes)
@@ -902,6 +911,12 @@ func (s *OpenAIGatewayService) handleChatStreamingResponse(
 		}
 
 		chunks := apicompat.ResponsesEventToChatChunks(&event, state)
+		if c != nil && c.GetBool("excel_bps_cache_creation_as_input") {
+			clearChatUsageCacheCreation(state.Usage)
+			for i := range chunks {
+				clearChatUsageCacheCreation(chunks[i].Usage)
+			}
+		}
 		if !clientDisconnected {
 			for _, chunk := range chunks {
 				refusalDetector.ObserveChatChunk(chunk)
