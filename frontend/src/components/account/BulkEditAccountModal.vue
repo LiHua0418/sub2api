@@ -1015,6 +1015,54 @@
         </div>
       </div>
 
+      <!-- OpenAI OAuth HTTP streaming over WS acceleration -->
+      <div v-if="allOpenAIOAuthOnly" class="border-t border-gray-200 pt-4 dark:border-dark-600">
+        <div class="mb-3 flex items-center justify-between">
+          <div class="flex-1 pr-4">
+            <label
+              id="bulk-edit-openai-ws-sse-acceleration-label"
+              class="input-label mb-0"
+              for="bulk-edit-openai-ws-sse-acceleration-enabled"
+            >
+              {{ t('admin.accounts.openai.wsSseAcceleration') }}
+            </label>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {{ t('admin.accounts.openai.wsSseAccelerationDesc') }}
+            </p>
+          </div>
+          <input
+            v-model="enableOpenAIWSSSEAcceleration"
+            id="bulk-edit-openai-ws-sse-acceleration-enabled"
+            type="checkbox"
+            aria-controls="bulk-edit-openai-ws-sse-acceleration-body"
+            class="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+          />
+        </div>
+        <div
+          id="bulk-edit-openai-ws-sse-acceleration-body"
+          :class="!enableOpenAIWSSSEAcceleration && 'pointer-events-none opacity-50'"
+          role="group"
+          aria-labelledby="bulk-edit-openai-ws-sse-acceleration-label"
+        >
+          <button
+            id="bulk-edit-openai-ws-sse-acceleration-toggle"
+            type="button"
+            :class="[
+              'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2',
+              openaiOAuthWSSSEAcceleration ? 'bg-primary-600' : 'bg-gray-200 dark:bg-dark-600'
+            ]"
+            @click="openaiOAuthWSSSEAcceleration = !openaiOAuthWSSSEAcceleration"
+          >
+            <span
+              :class="[
+                'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
+                openaiOAuthWSSSEAcceleration ? 'translate-x-5' : 'translate-x-0'
+              ]"
+            />
+          </button>
+        </div>
+      </div>
+
       <!-- OpenAI OAuth Codex CLI only -->
       <div v-if="allOpenAIOAuth" class="border-t border-gray-200 pt-4 dark:border-dark-600">
         <div class="mb-3 flex items-center justify-between">
@@ -1799,6 +1847,7 @@ const enableOpenAILongContextBilling = ref(false)
 const enableOpenAIEndpointCapabilities = ref(false)
 const enableOpenAIResponsesMode = ref(false)
 const enableOpenAIWSMode = ref(false)
+const enableOpenAIWSSSEAcceleration = ref(false)
 const enableOpenAIAPIKeyWSMode = ref(false)
 const enableUpstreamBillingAutoProbe = ref(false)
 const enableCodexCLIOnly = ref(false)
@@ -1837,6 +1886,7 @@ const excelBPSCacheCreationAsInput = ref(false)
 const excelBPSAutoDisableOn403 = ref(false)
 const excelBPSOmitUnsupportedTools = ref(false)
 const excelBPSIgnoreImages = ref(false)
+const openaiOAuthWSSSEAcceleration = ref(false)
 const excelBPSAutoMoveOn403 = ref(false)
 const excelBPS403TargetGroupID = ref<number | string>('')
 const excelBPS403GroupOptions = computed(() => [
@@ -2240,6 +2290,11 @@ const buildUpdatePayload = (): Record<string, unknown> | null => {
     )
   }
 
+  if (enableOpenAIWSSSEAcceleration.value && allOpenAIOAuthOnly.value) {
+    const extra = ensureExtra()
+    extra.openai_oauth_ws_sse_acceleration = openaiOAuthWSSSEAcceleration.value
+  }
+
   if (enableOpenAIAPIKeyWSMode.value) {
     const extra = ensureExtra()
     extra.openai_apikey_responses_websockets_v2_mode = openaiAPIKeyResponsesWebSocketV2Mode.value
@@ -2400,6 +2455,7 @@ const handleSubmit = async () => {
     enableStatus.value ||
     enableGroups.value ||
     enableOpenAIWSMode.value ||
+    (enableOpenAIWSSSEAcceleration.value && allOpenAIOAuthOnly.value) ||
     enableOpenAIAPIKeyWSMode.value ||
     enableUpstreamBillingAutoProbe.value ||
     enableCodexCLIOnly.value ||
@@ -2561,6 +2617,7 @@ watch(
       enableOpenAIEndpointCapabilities.value = false
       enableOpenAIResponsesMode.value = false
       enableOpenAIWSMode.value = false
+      enableOpenAIWSSSEAcceleration.value = false
       enableOpenAIAPIKeyWSMode.value = false
       enableUpstreamBillingAutoProbe.value = false
       enableCodexCLIOnly.value = false
@@ -2582,6 +2639,7 @@ watch(
       excelBPSAutoDisableOn403.value = false
       excelBPSOmitUnsupportedTools.value = false
       excelBPSIgnoreImages.value = false
+      openaiOAuthWSSSEAcceleration.value = false
       excelBPSAutoMoveOn403.value = false
       excelBPS403TargetGroupID.value = ''
       openaiPassthroughEnabled.value = false
