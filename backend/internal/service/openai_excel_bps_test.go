@@ -93,6 +93,46 @@ func TestExcelBPSForwardContract(t *testing.T) {
 		})
 	}
 }
+
+// When upstream BPS terminates with an error before any text token is emitted,
+// the gateway must NOT commit HTTP 200 headers or stream comments, and must return
+// a proper HTTP 429/502 error status instead of an empty completed stream.
+func TestExcelBPSStreamErrorBeforeFirstTokenDoesNotCommit200(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	t.Run("rate_limited_returns_429", func(t *testing.T) {
+		wire := "event: response.failed\ndata: {\"type\":\"response.failed\",\"response\":{\"status\":\"failed\",\"error\":{\"type\":\"server_error\",\"code\":\"basispoints_rate_limited\",\"message\":\"Rate limit reached\"}}}\n\n"
+		upstream := &httpUpstreamRecorder{resp: &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": {"text/event-stream"}}, Body: io.NopCloser(strings.NewReader(wire))}}
+		svc := openAIClientToolsTestService(upstream)
+		body := []byte(`{"model":"gpt-6-astra","stream":true,"input":"test"}`)
+		rec := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(rec)
+		c.Request = httptest.NewRequest("POST", "/v1/responses", bytes.NewReader(body))
+		account := excelAccount()
+		account.Proxy = &Proxy{Protocol: "http", Host: "127.0.0.1", Port: 7890}
+		account.Extra["openai_excel_bps_mihomo"] = false
+		_, err := svc.Forward(context.Background(), c, account, body)
+		require.Error(t, err)
+		require.Equal(t, http.StatusTooManyRequests, rec.Code)
+		require.Contains(t, rec.Body.String(), "basispoints_rate_limited")
+	})
+
+	t.Run("server_error_returns_502", func(t *testing.T) {
+		wire := "event: response.failed\ndata: {\"type\":\"response.failed\",\"response\":{\"status\":\"failed\",\"error\":{\"type\":\"server_error\",\"code\":\"internal_error\",\"message\":\"Upstream crashed\"}}}\n\n"
+		upstream := &httpUpstreamRecorder{resp: &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": {"text/event-stream"}}, Body: io.NopCloser(strings.NewReader(wire))}}
+		svc := openAIClientToolsTestService(upstream)
+		body := []byte(`{"model":"gpt-6-astra","stream":true,"input":"test"}`)
+		rec := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(rec)
+		c.Request = httptest.NewRequest("POST", "/v1/responses", bytes.NewReader(body))
+		account := excelAccount()
+		account.Proxy = &Proxy{Protocol: "http", Host: "127.0.0.1", Port: 7890}
+		account.Extra["openai_excel_bps_mihomo"] = false
+		_, err := svc.Forward(context.Background(), c, account, body)
+		require.Error(t, err)
+		require.Equal(t, http.StatusBadGateway, rec.Code)
+		require.Contains(t, rec.Body.String(), "internal_error")
+	})
+}
 func TestExcelBPSUsagePreservesRequestedEffortBeforeGroupMapping(t *testing.T) {
 	for _, tc := range []struct {
 		name, requested, ceiling, forwarded string

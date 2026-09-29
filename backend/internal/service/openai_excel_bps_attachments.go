@@ -39,7 +39,7 @@ func (s *OpenAIGatewayService) uploadExcelBPSAttachment(ctx context.Context, acc
 	req.Header.Set("Accept-Encoding", "identity")
 	req.ContentLength = length
 	resp, err := s.httpUpstream.Do(req, proxyURL, account.ID, account.Concurrency)
-	if err != nil {
+	if err != nil || resp == nil || resp.Body == nil {
 		return "", fmt.Errorf("excel BPS attachment connection failed")
 	}
 	// Release the account's upstream connection slot before starting Responses.

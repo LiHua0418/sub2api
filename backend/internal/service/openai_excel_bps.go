@@ -569,13 +569,26 @@ func (s *OpenAIGatewayService) forwardExcelBPS(ctx context.Context, c *gin.Conte
 	// client effort for usage display, and the BPS-normalized effort for billing.
 	requestedEffort := coalesceRequestedReasoningEffort(RequestedReasoningEffortFromContext(ctx), &bridge.RequestedEffort)
 	result := &OpenAIForwardResult{Model: originalModel, UpstreamModel: model, UpstreamEndpoint: "/basispoints/api/responses", Stream: stream, ReasoningEffort: &bridge.Effort, RequestedReasoningEffort: requestedEffort, RequestID: resp.Header.Get("x-request-id")}
-	if stream {
+	streamCommitted := false
+	var bufferedStreamLines []string
+	commitAndFlushStream := func() error {
+		if !stream || streamCommitted || c.Writer.Written() {
+			return nil
+		}
 		c.Header("Content-Type", "text/event-stream")
 		c.Header("Cache-Control", "no-cache")
 		c.Header("Connection", "keep-alive")
 		c.Header("X-Accel-Buffering", "no")
 		c.Writer.WriteHeader(http.StatusOK)
+		streamCommitted = true
+		for _, bl := range bufferedStreamLines {
+			if _, werr := c.Writer.WriteString(bl + "\n"); werr != nil {
+				return werr
+			}
+		}
+		bufferedStreamLines = nil
 		c.Writer.Flush()
+		return nil
 	}
 	scanner := newOpenAISSEReadPump(converted, 16<<20)
 	defer scanner.Close()
@@ -589,7 +602,9 @@ func (s *OpenAIGatewayService) forwardExcelBPS(ctx context.Context, c *gin.Conte
 	heartbeat := time.NewTicker(keepaliveInterval)
 	defer heartbeat.Stop()
 	keepalive := func() {
-		if stream && ctx.Err() == nil {
+		// Only emit keepalive comments after stream has been committed with first output,
+		// otherwise premature comments would commit HTTP 200 before the first token.
+		if stream && streamCommitted && ctx.Err() == nil {
 			_, _ = c.Writer.WriteString(":\n\n")
 			c.Writer.Flush()
 		}
@@ -599,9 +614,10 @@ func (s *OpenAIGatewayService) forwardExcelBPS(ctx context.Context, c *gin.Conte
 	cacheCreationAsInput := account.IsExcelBPSCacheCreationAsInputEnabled() || s.isExcelBPSCacheCreationAsInputGloballyEnabled(ctx)
 	for scanner.Next(ctx, 0, heartbeat.C, keepalive) {
 		line := scanner.Text()
+		kind := ""
 		if strings.HasPrefix(line, "data: ") {
 			payload := []byte(strings.TrimPrefix(line, "data: "))
-			kind := gjson.GetBytes(payload, "type").String()
+			kind = gjson.GetBytes(payload, "type").String()
 			if reduced, changed := ApplyOpenAICacheReductionToJSONBytes(c, payload); changed {
 				payload = reduced
 				line = "data: " + string(payload)
@@ -614,7 +630,7 @@ func (s *OpenAIGatewayService) forwardExcelBPS(ctx context.Context, c *gin.Conte
 				}
 				line = "data: " + string(payload)
 			}
-			if result.FirstTokenMs == nil && (kind == "response.output_text.delta" || kind == "response.output_item.added") {
+			if result.FirstTokenMs == nil && (kind == "response.output_text.delta" || kind == "response.output_item.added" || kind == "response.text.delta" || kind == "response.reasoning_text.delta") {
 				ms := int(time.Since(start).Milliseconds())
 				result.FirstTokenMs = &ms
 			}
@@ -630,13 +646,25 @@ func (s *OpenAIGatewayService) forwardExcelBPS(ctx context.Context, c *gin.Conte
 			}
 		}
 		if stream {
-			if _, err = c.Writer.WriteString(line + "\n"); err != nil {
-				result.ClientDisconnect = true
-				result.Duration = time.Since(start)
-				return result, err
-			}
-			if line == "" {
-				c.Writer.Flush()
+			if streamCommitted {
+				if _, err = c.Writer.WriteString(line + "\n"); err != nil {
+					result.ClientDisconnect = true
+					result.Duration = time.Since(start)
+					return result, err
+				}
+				if line == "" {
+					c.Writer.Flush()
+				}
+			} else {
+				bufferedStreamLines = append(bufferedStreamLines, line)
+				// Commit and flush buffer on first semantic output or successful completion
+				if result.FirstTokenMs != nil || kind == "response.completed" {
+					if err = commitAndFlushStream(); err != nil {
+						result.ClientDisconnect = true
+						result.Duration = time.Since(start)
+						return result, err
+					}
+				}
 			}
 		}
 	}
@@ -655,7 +683,7 @@ func (s *OpenAIGatewayService) forwardExcelBPS(ctx context.Context, c *gin.Conte
 		recordExcelBPSTransportFailure(ctx, c, account, scope, proxyURL, err, "stream", c.GetInt("excel_bps_upstream_attempt"), false)
 		MarkOpsStreamError(c, "basispoints_stream_incomplete", "Excel BPS stream ended before completion", http.StatusBadGateway)
 		MarkResponseCommitted(c)
-		if stream {
+		if stream && streamCommitted {
 			_, _ = c.Writer.WriteString("event: response.failed\ndata: {\"type\":\"response.failed\",\"response\":{\"status\":\"failed\",\"error\":{\"type\":\"server_error\",\"code\":\"basispoints_stream_incomplete\",\"message\":\"Upstream stream ended before completion\"}}}\n\n")
 			c.Writer.Flush()
 		} else {
@@ -666,10 +694,24 @@ func (s *OpenAIGatewayService) forwardExcelBPS(ctx context.Context, c *gin.Conte
 	if terminal != "response.completed" {
 		MarkResponseCommitted(c)
 	}
-	if !stream {
+	if !stream || !streamCommitted {
 		if terminal != "response.completed" {
-			c.JSON(502, gin.H{"error": gin.H{"code": "basispoints_protocol_error", "message": "Excel BPS did not complete the response"}})
-		} else {
+			status := http.StatusBadGateway
+			errorCode := "basispoints_protocol_error"
+			errorMsg := "Excel BPS did not complete the response"
+			if len(completed) > 0 {
+				if code := gjson.GetBytes(completed, "error.code").String(); code != "" {
+					errorCode = code
+					if strings.Contains(code, "rate_limit") || strings.Contains(code, "quota") {
+						status = http.StatusTooManyRequests
+					}
+				}
+				if msg := gjson.GetBytes(completed, "error.message").String(); msg != "" {
+					errorMsg = msg
+				}
+			}
+			c.JSON(status, gin.H{"error": gin.H{"type": "server_error", "code": errorCode, "message": errorMsg}})
+		} else if !stream {
 			c.Data(200, "application/json", completed)
 		}
 	}
