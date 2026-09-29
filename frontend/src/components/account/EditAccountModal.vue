@@ -2063,6 +2063,23 @@
         </div>
       </div>
 
+      <div
+        v-if="account?.platform === 'openai' && account?.type === 'oauth'"
+        class="flex items-center justify-between gap-4 border-t border-gray-200 pt-4 dark:border-dark-600"
+      >
+        <div>
+          <label class="input-label mb-0">{{ t('admin.accounts.openai.wsSseAcceleration') }}</label>
+          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            {{ t('admin.accounts.openai.wsSseAccelerationDesc') }}
+          </p>
+        </div>
+        <Toggle
+          v-model="openaiOAuthWSSSEAcceleration"
+          data-testid="openai-ws-sse-acceleration"
+          :aria-label="t('admin.accounts.openai.wsSseAcceleration')"
+        />
+      </div>
+
       <!-- OpenAI APIKey images: backfill b64_json from url -->
       <div
         v-if="account?.platform === 'openai' && account?.type === 'apikey'"
@@ -3902,6 +3919,7 @@ const openAIResponsesMode = ref<OpenAIResponsesMode>('auto')
 const openAIImagesUrlToB64JsonEnabled = ref(false)
 const openAIEndpointCapabilities = ref<OpenAIEndpointCapability[]>(['chat_completions', 'embeddings'])
 const openaiOAuthResponsesWebSocketV2Mode = ref<OpenAIWSMode>(OPENAI_WS_MODE_OFF)
+const openaiOAuthWSSSEAcceleration = ref(false)
 const openaiAPIKeyResponsesWebSocketV2Mode = ref<OpenAIWSMode>(OPENAI_WS_MODE_OFF)
 const codexCLIOnlyEnabled = ref(false)
 const codexCLIOnlyAppServerEnabled = ref(false)
@@ -4401,6 +4419,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
   openAIEndpointCapabilities.value = ['chat_completions', 'embeddings']
   openAICompactModelMappings.value = []
   openaiOAuthResponsesWebSocketV2Mode.value = OPENAI_WS_MODE_OFF
+  openaiOAuthWSSSEAcceleration.value = false
   openaiAPIKeyResponsesWebSocketV2Mode.value = OPENAI_WS_MODE_OFF
   codexCLIOnlyEnabled.value = false
   codexCLIOnlyAppServerEnabled.value = false
@@ -4456,6 +4475,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
     } else if (codexImageGenerationBridgeValue === false) {
       codexImageToolMode.value = 'disabled'
     }
+    openaiOAuthWSSSEAcceleration.value = newAccount.type === 'oauth' && extra?.openai_oauth_ws_sse_acceleration === true
     openaiOAuthResponsesWebSocketV2Mode.value = resolveOpenAIWSModeFromExtra(extra, {
       modeKey: 'openai_oauth_responses_websockets_v2_mode',
       enabledKey: 'openai_oauth_responses_websockets_v2_enabled',
@@ -5969,6 +5989,11 @@ const handleSubmit = async () => {
       } else if (props.account.type === 'apikey') {
         newExtra.openai_apikey_responses_websockets_v2_mode = openaiAPIKeyResponsesWebSocketV2Mode.value
         newExtra.openai_apikey_responses_websockets_v2_enabled = isOpenAIWSModeEnabled(openaiAPIKeyResponsesWebSocketV2Mode.value)
+      }
+      if (props.account.type === 'oauth' && openaiOAuthWSSSEAcceleration.value) {
+        newExtra.openai_oauth_ws_sse_acceleration = true
+      } else {
+        delete newExtra.openai_oauth_ws_sse_acceleration
       }
       delete newExtra.responses_websockets_v2_enabled
       delete newExtra.openai_ws_enabled
