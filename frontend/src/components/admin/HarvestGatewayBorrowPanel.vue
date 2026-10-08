@@ -42,8 +42,24 @@
             </div>
             <p class="mt-3 text-xs text-gray-500">{{ t(`${p}.savedState`) }}：{{ t(saved?.cookie_pool.enabled ? `${p}.enabled` : `${p}.disabled`) }}</p>
             <div class="mt-5 grid gap-4 md:grid-cols-2">
-              <AstraAccountPicker v-model="draft.cookie_pool.source_account_ids" :label="t(`${p}.sources`)" :accounts="accounts" :disabled="saving" />
-              <AstraAccountPicker v-model="draft.cookie_pool.target_account_ids" :label="t(`${p}.targets`)" :accounts="accounts" :disabled="saving" />
+              <AstraAccountPicker
+                v-model="draft.cookie_pool.source_account_ids"
+                :label="t(`${p}.sources`)"
+                :accounts="accounts"
+                :disabled="saving"
+                :exclude-ids="draft.cookie_pool.target_account_ids"
+                :exclude-label="t(`${p}.selectedAsTarget`)"
+                :max="256"
+              />
+              <AstraAccountPicker
+                v-model="draft.cookie_pool.target_account_ids"
+                :label="t(`${p}.targets`)"
+                :accounts="accounts"
+                :disabled="saving"
+                :exclude-ids="draft.cookie_pool.source_account_ids"
+                :exclude-label="t(`${p}.selectedAsSource`)"
+                :max="256"
+              />
             </div>
             <div class="mt-4 flex items-start justify-between gap-4 rounded-lg border border-gray-200 p-4 dark:border-dark-600">
               <div>
@@ -111,7 +127,7 @@
               <Toggle v-model="draft.ws_session.enabled" data-testid="ws-toggle" :aria-label="t(`${p}.wsTitle`)" />
             </div>
             <p class="mt-3 text-xs text-gray-500">{{ t(`${p}.savedState`) }}：{{ t(saved?.ws_session.enabled ? `${p}.enabled` : `${p}.disabled`) }}</p>
-            <div class="mt-5"><AstraAccountPicker v-model="draft.ws_session.account_ids" :label="t(`${p}.wsAccounts`)" :accounts="accounts" :disabled="saving" /></div>
+            <div class="mt-5"><AstraAccountPicker v-model="draft.ws_session.account_ids" :label="t(`${p}.wsAccounts`)" :accounts="accounts" :disabled="saving" :max="256" /></div>
             <label class="mt-4 flex items-center gap-3 text-sm">{{ t(`${p}.wsTTL`) }}<input v-model.number="draft.ws_session.ttl_seconds" class="input w-28" type="number" min="60" max="3600" required /> s</label>
             <p class="mt-4 text-xs leading-6 text-gray-500 dark:text-gray-400">{{ t(`${p}.wsHint`) }}</p>
           </section>

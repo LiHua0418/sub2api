@@ -981,8 +981,8 @@ func (c CodexGatewayPinConfig) Validate() error {
 	if !c.Enabled {
 		return nil
 	}
-	if len(c.SourceAccountIDs) == 0 || len(c.TargetAccountIDs) == 0 || len(c.SourceAccountIDs) > 64 || len(c.TargetAccountIDs) > 64 {
-		return fmt.Errorf("gateway.codex_gateway_pin requires 1–64 source_account_ids and target_account_ids")
+	if len(c.SourceAccountIDs) == 0 || len(c.TargetAccountIDs) == 0 || len(c.SourceAccountIDs) > 256 || len(c.TargetAccountIDs) > 256 {
+		return fmt.Errorf("gateway.codex_gateway_pin requires 1–256 source_account_ids and target_account_ids")
 	}
 	seen := map[int64]bool{}
 	for _, ids := range [][]int64{c.SourceAccountIDs, c.TargetAccountIDs} {
@@ -1011,8 +1011,8 @@ func (c CodexWSAnchorConfig) Validate() error {
 	if !c.Enabled {
 		return nil
 	}
-	if len(c.AccountIDs) == 0 || len(c.AccountIDs) > 64 {
-		return fmt.Errorf("gateway.codex_ws_anchor requires 1–64 account_ids")
+	if len(c.AccountIDs) == 0 || len(c.AccountIDs) > 256 {
+		return fmt.Errorf("gateway.codex_ws_anchor requires 1–256 account_ids")
 	}
 	seen := map[int64]bool{}
 	for _, id := range c.AccountIDs {
