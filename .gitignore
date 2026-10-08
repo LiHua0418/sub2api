@@ -168,3 +168,6 @@ issues/
 !docs/codex-ticket-pinning.md
 sub2api-bin
 backend/sub2api-bin
+
+!docs/harvest-gateway-borrow.md
+!docs/screenshots/harvest-gateway-borrow/

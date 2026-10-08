@@ -181,10 +181,14 @@ type httpUpstreamService struct {
 // 返回:
 //   - service.HTTPUpstream 接口实现
 func NewHTTPUpstream(cfg *config.Config) service.HTTPUpstream {
-	return &httpUpstreamService{
+	s := &httpUpstreamService{
 		cfg:     cfg,
 		clients: make(map[string]*upstreamClientEntry),
 	}
+	if cfg != nil && (cfg.HasAstraRoutingLoader() || cfg.Gateway.CodexGatewayPin.Enabled) {
+		return &astraRoutingUpstream{delegate: s, cfg: cfg}
+	}
+	return s
 }
 
 // Do 执行 HTTP 请求
