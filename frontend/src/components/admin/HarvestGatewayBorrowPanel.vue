@@ -19,10 +19,11 @@
           <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t(`${p}.configuration`) }}</h3>
           <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ t(`${p}.description`) }}</p>
         </div>
-        <div class="flex items-center gap-2">
-          <span v-if="dirty" class="text-xs text-amber-600">{{ t(`${p}.unsaved`) }}</span>
+        <div class="flex flex-wrap items-center gap-2">
+          <span v-if="dirty && !validation" class="text-xs text-amber-600">{{ t(`${p}.unsaved`) }}</span>
+          <span v-if="validation" class="text-xs font-medium text-amber-600 dark:text-amber-400">⚠️ {{ validation }}</span>
           <button class="btn btn-secondary" type="button" :disabled="loading || saving" @click="load">{{ t(dirty ? `${p}.discard` : 'common.refresh') }}</button>
-          <button data-testid="save" class="btn btn-primary" type="submit" form="astra-gateway-form" :disabled="!draft || !dirty || saving || !!validation">{{ t(saving ? `${p}.saving` : `${p}.save`) }}</button>
+          <button data-testid="save" class="btn btn-primary" type="submit" form="astra-gateway-form" :disabled="!draft || !dirty || saving || !!validation" @click="save">{{ t(saving ? `${p}.saving` : `${p}.save`) }}</button>
         </div>
       </header>
       <p v-if="error" role="alert" class="rounded-xl bg-red-50 p-4 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-300">{{ error }}</p>
