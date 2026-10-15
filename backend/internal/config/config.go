@@ -1078,8 +1078,8 @@ func (c CodexGatewayPinConfig) Validate() error {
 	if c.MaxNodeAttempts < 0 || c.MaxNodeAttempts > 10 {
 		return fmt.Errorf("astra node attempts must be 1–10 (0 uses default 3)")
 	}
-	if c.TTLSeconds != 0 && (c.TTLSeconds < 30 || c.TTLSeconds > 240) {
-		return fmt.Errorf("cookie TTL must be 30–240 seconds")
+	if c.TTLSeconds != 0 && (c.TTLSeconds < 30 || c.TTLSeconds > 86400) {
+		return fmt.Errorf("cookie TTL must be 30–86400 seconds")
 	}
 	if !c.Enabled {
 		return nil
@@ -2654,8 +2654,8 @@ func setDefaults() {
 	viper.SetDefault("gateway.prism_browser.api_key", "")
 	viper.SetDefault("gateway.openai_codex_ticket.enabled", false)
 	viper.SetDefault("gateway.openai_codex_ticket.target_length", 780)
-	viper.SetDefault("gateway.openai_codex_ticket.ttl_seconds", 240)
-	viper.SetDefault("gateway.openai_codex_ticket.refresh_before_seconds", 60)
+	viper.SetDefault("gateway.openai_codex_ticket.ttl_seconds", 1800)
+	viper.SetDefault("gateway.openai_codex_ticket.refresh_before_seconds", 180)
 	viper.SetDefault("gateway.openai_codex_ticket.harvest_proxy_url", "")
 	viper.SetDefault("gateway.openai_codex_ticket.harvest_probe_interval_seconds", 180)
 	viper.SetDefault("gateway.openai_codex_ticket.harvest_cooldown_seconds", 180)

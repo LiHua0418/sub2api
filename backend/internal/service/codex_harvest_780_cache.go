@@ -23,8 +23,8 @@ type codex780RouteCache struct {
 	entries map[[32]byte]codex780RouteEntry
 }
 
-func codex780RouteKey(account *Account, token, accountHeader, target, transport string) [32]byte {
-	raw, _ := json.Marshal([]any{account.ID, ticketIdentity(account), token, accountHeader, target, transport})
+func codex780RouteKey(account *Account, token, accountHeader, target, transport, model string) [32]byte {
+	raw, _ := json.Marshal([]any{account.ID, ticketIdentity(account), token, accountHeader, target, transport, normalizeOpenAICodexTicketModel(model)})
 	return sha256.Sum256(raw)
 }
 

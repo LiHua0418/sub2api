@@ -636,7 +636,7 @@ describe('quality operations', () => {
     expect(wrapper.find('#quality-prompt').exists()).toBe(false)
     await wrapper.find('[data-testid="quality-question-kind"]').setValue('candy')
     expect(wrapper.find('#quality-prompt').exists()).toBe(true)
-    expect(vm.form.pelican_config.quality.expected_answer).toBe('21')
+    expect(vm.form.pelican_config.quality.expected_answer).toBe('29')
     expect(vm.form.pelican_config.quality.judge).toEqual({ group_id: 0, model_id: '', prompt: 'qualityOps.defaultJudgePrompt' })
     await vm.save()
     expect(scheduledTests.update).not.toHaveBeenCalled()

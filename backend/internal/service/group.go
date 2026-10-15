@@ -135,6 +135,11 @@ type Group struct {
 	ProfitMinMargin      float64 // 最低毛利率，小数存储（0.30=30%）
 	ProfitSafetyBuffer   float64 // 安全缓冲，小数，与 margin 相加后从 D 中扣除
 
+	// 上游缓存削减：针对 OpenAI/Codex 管道
+	CacheReductionEnabled  bool
+	CacheReductionMinRatio float64 // 缓存削减最小比例，小数存储（0.05=5%）
+	CacheReductionMaxRatio float64 // 缓存削减最大比例，小数存储（0.10=10%）
+
 	CreatedAt time.Time
 	UpdatedAt time.Time
 
@@ -470,6 +475,60 @@ func profitControlPlatformSupported(platform string) bool {
 	default:
 		return false
 	}
+}
+
+// validCacheReductionRatio 判定 ratio 是否为合法小数：[0,1] 且非 NaN/Inf。
+func validCacheReductionRatio(v float64) bool {
+	if math.IsNaN(v) || math.IsInf(v, 0) {
+		return false
+	}
+	return v >= 0 && v <= 1.0
+}
+
+func cacheReductionPlatformSupported(platform string) bool {
+	switch platform {
+	case PlatformOpenAI, PlatformComposite:
+		return true
+	default:
+		return false
+	}
+}
+
+// ValidateCacheReductionConfig 是分组缓存削减配置的校验来源。
+func ValidateCacheReductionConfig(platform string, enabled bool, minRatio, maxRatio float64) error {
+	if !enabled {
+		return nil
+	}
+	if !cacheReductionPlatformSupported(platform) {
+		return errors.New("缓存削减仅支持 openai 和 composite 平台分组")
+	}
+	if !validCacheReductionRatio(minRatio) {
+		return fmt.Errorf("cache_reduction_min_ratio 应为 [0,1] 的小数，got %v", minRatio)
+	}
+	if !validCacheReductionRatio(maxRatio) {
+		return fmt.Errorf("cache_reduction_max_ratio 应为 [0,1] 的小数，got %v", maxRatio)
+	}
+	if minRatio > maxRatio {
+		return errors.New("cache_reduction_min_ratio 不能大于 cache_reduction_max_ratio")
+	}
+	return nil
+}
+
+// NormalizeCacheReductionConfig 归一化缓存削减配置
+func NormalizeCacheReductionConfig(platform string, enabled bool, minRatio, maxRatio float64) (bool, float64, float64) {
+	if !cacheReductionPlatformSupported(platform) {
+		return false, 0, 0
+	}
+	if !validCacheReductionRatio(minRatio) {
+		minRatio = 0
+	}
+	if !validCacheReductionRatio(maxRatio) {
+		maxRatio = 0
+	}
+	if minRatio > maxRatio {
+		minRatio = maxRatio
+	}
+	return enabled, minRatio, maxRatio
 }
 
 // GetSearchPricePer1k returns explicit search/tool price per 1k calls if configured.

@@ -104,6 +104,9 @@ func (s *astraRoutingUpstream) targetRouteOnce(req *http.Request, proxy string, 
 	force, _ := req.Context().Value(astraForceProbeKey{}).(bool)
 	if exists && old.key == key && now.Before(old.expires) && !force {
 		if old.passed {
+			if pool.config.IPAffinity && !pool.config.RotateNodes && route.proxy != "" {
+				proxy = route.proxy
+			}
 			return cookie, key, proxy, release, nil
 		}
 		if now.Before(old.retryAfter) {
@@ -111,11 +114,15 @@ func (s *astraRoutingUpstream) targetRouteOnce(req *http.Request, proxy string, 
 		}
 	}
 
-	ctx, cancel := context.WithTimeout(req.Context(), 90*time.Second)
+	ctx, cancel := context.WithTimeout(req.Context(), 120*time.Second)
 	defer cancel()
 	probe := req.Clone(service.WithHTTPUpstreamRedirectsDisabled(ctx))
 	replaceCodexGatewayCookie(probe, cookie)
-	result := service.ProbeOpenAICodexStateRoute(ctx, s.delegate, probe, proxy, id, n, profile)
+	probeProxy := proxy
+	if pool.config.IPAffinity && !pool.config.RotateNodes && route.proxy != "" {
+		probeProxy = route.proxy
+	}
+	result := service.ProbeOpenAICodexStateRoute(ctx, s.delegate, probe, probeProxy, id, n, profile)
 	passed := result.Verdict == service.OpenAICodexStateHealthy
 	reason := "target_probe_failed"
 	if result.Verdict == service.OpenAICodexStateDegraded {
@@ -123,6 +130,9 @@ func (s *astraRoutingUpstream) targetRouteOnce(req *http.Request, proxy string, 
 	}
 	if result.Failure == "route_changed" {
 		reason = "target_route_changed"
+	}
+	if passed {
+		reason = "target_probe_passed"
 	}
 
 	if s.current(req.Context()) != pool {
@@ -162,6 +172,9 @@ func (s *astraRoutingUpstream) targetRouteOnce(req *http.Request, proxy string, 
 	if !passed {
 		pool.rememberTargetFailure(id, pool.targetChecks[id])
 		return nil, key, proxy, release, errors.New(reason)
+	}
+	if pool.config.IPAffinity && !pool.config.RotateNodes && route.proxy != "" {
+		proxy = route.proxy
 	}
 	return cookie, key, proxy, release, nil
 }

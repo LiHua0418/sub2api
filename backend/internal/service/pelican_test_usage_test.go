@@ -36,7 +36,9 @@ func TestPelicanTestUsageStreams(t *testing.T) {
 			want: UsageTokens{InputTokens: 100, OutputTokens: 200, CacheReadTokens: 60, CacheCreationTokens: 40, CacheCreation5mTokens: 20, CacheCreation1hTokens: 20},
 		},
 		{
-			name: "responses subtracts cache hits and counts reasoning once", process: svc.processOpenAIStream,
+			name: "responses subtracts cache hits and counts reasoning once", process: func(c *gin.Context, body io.Reader) error {
+				return svc.processOpenAIStream(c, body)
+			},
 			events: []string{
 				`{"type":"response.in_progress","response":{"usage":{"input_tokens":1000,"output_tokens":10,"input_tokens_details":{"cached_tokens":800}}}}`,
 				`{"type":"response.completed","response":{"usage":{"input_tokens":1000,"output_tokens":200,"input_tokens_details":{"cached_tokens":800},"output_tokens_details":{"reasoning_tokens":150}}}}`,

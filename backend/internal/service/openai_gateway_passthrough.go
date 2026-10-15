@@ -2205,6 +2205,11 @@ func (s *OpenAIGatewayService) handleStreamingResponsePassthroughWithImage(
 					trimmedData = strings.TrimSpace(string(restoredData))
 					line = "data: " + string(restoredData)
 				}
+				if reducedData, changed := ApplyOpenAICacheReductionToJSONBytes(c, dataBytes); changed {
+					dataBytes = reducedData
+					trimmedData = strings.TrimSpace(string(reducedData))
+					line = "data: " + string(reducedData)
+				}
 			}
 			eventType := effectiveOpenAISSEEventType(dataBytes, rawEventType)
 			if codexFailureTerminal && sawBareError && !sawResponseFailed && eventType != "response.failed" {
@@ -2516,6 +2521,10 @@ func (s *OpenAIGatewayService) handleNonStreamingResponsePassthrough(
 		return s.handlePassthroughSSEToJSON(resp, c, account, body, originalModel, mappedModel)
 	}
 
+	if reduced, changed := ApplyOpenAICacheReductionToJSONBytes(c, body); changed {
+		body = reduced
+	}
+
 	usage := &OpenAIUsage{}
 	usageParsed := false
 	if len(body) > 0 {
@@ -2602,6 +2611,10 @@ func (s *OpenAIGatewayService) handlePassthroughSSEToJSON(resp *http.Response, c
 		}
 		finalResponse = supplementCompactionItemFromSSE(c, finalResponse, bodyText)
 		body = finalResponse
+		if reducedResponse, changed := ApplyOpenAICacheReductionToJSONBytes(c, finalResponse); changed {
+			finalResponse = reducedResponse
+			body = finalResponse
+		}
 		if originalModel != "" && mappedModel != "" && originalModel != mappedModel {
 			body = s.replaceModelInResponseBody(body, mappedModel, originalModel)
 		}

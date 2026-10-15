@@ -8,9 +8,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"maps"
 	"net/http"
 	"net/url"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -21,6 +23,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
+	"github.com/google/uuid"
 	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
 )
@@ -34,7 +37,7 @@ const (
 	openAICodexTicketDefaultSolModel = "gpt-5.6-sol"
 	openAICodexTicketPersonalBlocks  = 10
 	openAICodexTicketTeamBlocks      = 12
-	openAICodexCredentialTTL         = 240 * time.Second
+	openAICodexCredentialTTL         = 1800 * time.Second
 )
 
 // ErrOpenAICodexTicketUnavailable 表示该号该模型没有可用的 292 门票，
@@ -356,12 +359,19 @@ func (s *OpenAIGatewayService) openAICodexTicketHarvestProxyURL() string {
 // openAICodexTicketHarvestProxySetting returns the configured harvest exit
 // verbatim, including the IP-pool sentinel.
 func (s *OpenAIGatewayService) openAICodexTicketHarvestProxySetting(ctx context.Context) string {
+	raw := ""
 	if s.settingService != nil {
 		if proxy := s.settingService.GetOpenAICodexTicketHarvestProxyURL(ctx); proxy != "" {
-			return proxy
+			raw = proxy
 		}
 	}
-	return strings.TrimSpace(s.openAICodexTicketConfig().HarvestProxyURL)
+	if raw == "" {
+		raw = s.openAICodexTicketConfig().HarvestProxyURL
+	}
+	raw = strings.TrimSpace(raw)
+	raw = strings.Trim(raw, "\"")
+	raw = strings.Trim(raw, "'")
+	return strings.TrimSpace(raw)
 }
 
 func (s *OpenAIGatewayService) openAICodexTicketHarvestIPPoolEnabled(ctx context.Context) bool {
@@ -385,7 +395,93 @@ func (s *OpenAIGatewayService) openAICodexTicketHarvestProxyURLContext(ctx conte
 		exit, _ := s.pickHarvestIPPoolExit(ctx, nil)
 		return exit.url
 	}
-	return proxy
+	if isDynamicProxyAPIURL(proxy) {
+		resolved, err := s.resolveDynamicAPIProxy(ctx, proxy)
+		if err == nil && resolved != "" {
+			return resolved
+		}
+	}
+	return rotateHarvestProxySession(proxy)
+}
+
+// harvestRegions 轮转全球各大区，避免死磕某一受灾国家节点；严格排除中国大陆(CN)、香港(HK)与澳门(MO)
+var harvestRegions = []string{"US", "GB", "FR", "DE", "NL", "CA", "SG", "JP", "AU", "BR", "SE", "NO", "CH", "IT", "NZ", "KR", "TW"}
+var harvestRegionIdx uint64
+
+func rotateHarvestProxySession(rawProxy string) string {
+	rawProxy = strings.TrimSpace(rawProxy)
+	if rawProxy == "" || (!strings.Contains(rawProxy, "trustsource.live") && !strings.Contains(rawProxy, "rotgb")) {
+		return rawProxy
+	}
+	u, err := url.Parse(rawProxy)
+	if err != nil || u.User == nil {
+		return rawProxy
+	}
+	user := u.User.Username()
+	pass, _ := u.User.Password()
+	sessID := fmt.Sprintf("h%d", time.Now().UnixNano()%1000000)
+
+	// 轮转全球各大区，避免死磕某一受灾国家节点
+	idx := atomic.AddUint64(&harvestRegionIdx, 1)
+	reg := harvestRegions[idx%uint64(len(harvestRegions))]
+
+	if strings.Contains(user, "-region-") {
+		re := regexp.MustCompile(`-region-[^-]+`)
+		user = re.ReplaceAllString(user, "-region-"+reg)
+	} else if strings.Contains(user, "-zone-custom") {
+		user = strings.Replace(user, "-zone-custom", "-zone-custom-region-"+reg, 1)
+	}
+
+	if strings.Contains(user, "-session-") {
+		re := regexp.MustCompile(`-session-[^-]+`)
+		user = re.ReplaceAllString(user, "-session-"+sessID)
+	} else if strings.Contains(user, "-zone-custom") {
+		user = strings.Replace(user, "-zone-custom", "-zone-custom-session-"+sessID, 1)
+	}
+	u.User = url.UserPassword(user, pass)
+	return u.String()
+}
+
+func (s *OpenAIGatewayService) resolveDynamicAPIProxy(ctx context.Context, apiURL string) (string, error) {
+	// Check cached dynamic proxy (valid for 5 minutes)
+	now := time.Now()
+	s.harvestIPPoolMu.Lock()
+	if s.cachedDynamicProxyURL != "" && now.Before(s.cachedDynamicProxyExp) {
+		cached := s.cachedDynamicProxyURL
+		s.harvestIPPoolMu.Unlock()
+		return cached, nil
+	}
+	s.harvestIPPoolMu.Unlock()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	if err != nil {
+		return "", err
+	}
+	client := &http.Client{Timeout: 8 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	raw := strings.TrimSpace(string(b))
+	if !strings.Contains(raw, ":") {
+		return "", fmt.Errorf("invalid dynamic proxy response: %s", raw)
+	}
+	if !strings.HasPrefix(raw, "http://") && !strings.HasPrefix(raw, "socks5://") {
+		raw = "http://" + raw
+	}
+
+	s.harvestIPPoolMu.Lock()
+	s.cachedDynamicProxyURL = raw
+	s.cachedDynamicProxyExp = now.Add(5 * time.Minute)
+	s.harvestIPPoolMu.Unlock()
+
+	logger.FromContext(ctx).Info("openai_codex_ticket dynamic proxy fetched from API", zap.String("proxy", raw))
+	return raw, nil
 }
 
 type harvestIPPoolExit struct {
@@ -528,8 +624,10 @@ func (t *openAICodexTicket) needsRefresh(now time.Time, refreshBefore time.Durat
 	if t == nil || t.ExpiresAt.IsZero() {
 		return true
 	}
-	if t.Length == 780 && refreshBefore > 60*time.Second {
-		refreshBefore = 60 * time.Second
+	if t.Length == 780 {
+		if !t.IssuedAt.IsZero() && now.Sub(t.IssuedAt) > 10*time.Minute {
+			return true
+		}
 	}
 	return !openAICodexTicketRemainingUntil(t).After(now.Add(refreshBefore))
 }
@@ -582,7 +680,7 @@ func (s *OpenAIGatewayService) lookupCodexTicketLocked(account *Account, model s
 		}
 		gateway := controls.TargetGateway
 		if gateway == "" {
-			gateway = "unified-88"
+			gateway = "any"
 		}
 		if mem != nil && (mem.Transport != protocol || !codex780GatewayAllowed(mem.Gateway, gateway)) {
 			mem = nil
@@ -662,11 +760,10 @@ func (s *OpenAIGatewayService) storeOpenAICodexTicket(ctx context.Context, accou
 	defer s.openaiCodexTicketStateMu.Unlock()
 	model := normalizeOpenAICodexTicketModel(ticket.Model)
 	ticket.Identity = ticketIdentity(account)
-	if current := s.lookupCodexTicketLocked(account, model); current.valid(time.Now(), openAICodexTicketTargetLength(account, s.openAICodexTicketConfig())) && current.State != ticket.State {
-		copy := *current
-		copy.Standby = ticket
-		ticket = &copy
-		standby = true
+	if current := s.lookupCodexTicketLocked(account, model); current != nil && current.valid(time.Now(), openAICodexTicketTargetLength(account, s.openAICodexTicketConfig())) && current.State != ticket.State {
+		// 新打出并通过严格质检的高质量票必须立刻作为 Primary 激活生效！
+		// 旧票降级保存为 Standby 备用，杜绝旧票/陈旧上下文继续霸占 Primary 导致降智。
+		ticket.Standby = current
 	}
 	ticket.Model = model
 	ticket.AccountID = account.ID
@@ -692,7 +789,7 @@ func (s *OpenAIGatewayService) storeOpenAICodexTicket(ctx context.Context, accou
 }
 
 func harvestTicketSessionID(ticket *openAICodexTicket) string {
-	if ticket == nil || ticket.Length == 780 {
+	if ticket == nil {
 		return ""
 	}
 	return strings.TrimSpace(ticket.HarvestSessionID)
@@ -730,17 +827,14 @@ func (s *OpenAIGatewayService) harvestPinsCodexIdentity(ctx context.Context, acc
 // 请求路径只注入已捕获的有效门票，不现场打票；无票则返回
 // ErrOpenAICodexTicketUnavailable。打票由后台 harvester 完成。
 func (s *OpenAIGatewayService) applyOpenAICodexTicket(ctx context.Context, account *Account, model string, h http.Header, transport ...string) error {
-	if s == nil || h == nil || !isOpenAICodexTicketAccount(account, model) || !s.openAICodexTicketEnabledContext(ctx) {
+	if s == nil || h == nil || !isOpenAICodexTicketAccount(account, model) {
 		return nil
 	}
 	model = normalizeOpenAICodexTicketModel(model)
-	if model == "" || !s.openAICodexTicketGatedModel(model) {
+	if model == "" {
 		return nil
 	}
 	cfg := s.openAICodexTicketConfig()
-	if !openAICodexSkipHarvest(account) && cfg.FailClosed && s.openAICodexTicketHarvestExcluded(account) {
-		return denyOpenAITicket()
-	}
 	ticket := s.lookupOpenAICodexTicket(account, model)
 	if ticket.valid(time.Now(), openAICodexTicketTargetLength(account, cfg)) {
 		protocol := "sse"
@@ -758,20 +852,17 @@ func (s *OpenAIGatewayService) applyOpenAICodexTicket(ctx context.Context, accou
 		}
 
 		h.Set(openAICodexTurnStateHeader, ticket.State)
+		if len(ticket.HarvestCookies) > 0 && codexTicketCookiesFresh(ticket, time.Now()) {
+			h.Set("Cookie", strings.Join(ticket.HarvestCookies, "; "))
+		}
+		if ticket.HarvestSessionID != "" {
+			h.Set("session_id", ticket.HarvestSessionID)
+		} else if h.Get("session_id") == "" {
+			h.Set("session_id", uuid.NewString())
+		}
 		return nil
 	}
-	if openAICodexSkipHarvest(account) {
-		return nil
-	}
-	if openAICodexSkipHarvest(account) {
-		// Do not harvest, but the account stays usable. Own leftover tickets
-		// were injected above; missing tickets fail-open instead of pausing.
-		return nil
-	}
-	if !cfg.FailClosed {
-		return nil
-	}
-	return denyOpenAITicket()
+	return nil
 }
 
 // openAICodexTicketOutboundModel 预测本请求真正出站的模型名，也就是
@@ -1330,11 +1421,18 @@ func MergeOpenAICodexTicketExtra(extra, current map[string]any) map[string]any {
 // a network request or including credentials in validation errors.
 func ValidateOpenAICodexTicketHarvestProxyURL(raw string) error {
 	raw = strings.TrimSpace(raw)
+	raw = strings.Trim(raw, "\"")
+	raw = strings.Trim(raw, "'")
+	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return nil
 	}
 	// The IP 管理 pool sentinel is not a dialable exit; it is resolved per attempt.
 	if raw == OpenAICodexTicketHarvestIPPoolURL {
+		return nil
+	}
+	// Allow dynamic proxy generation API URLs (e.g. 711Proxy /gen?...)
+	if isDynamicProxyAPIURL(raw) {
 		return nil
 	}
 	parsed, err := url.Parse(raw)
@@ -1355,6 +1453,12 @@ func ValidateOpenAICodexTicketHarvestProxyURL(raw string) error {
 	return nil
 }
 
+func isDynamicProxyAPIURL(raw string) bool {
+	raw = strings.TrimSpace(raw)
+	return (strings.HasPrefix(raw, "http://") || strings.HasPrefix(raw, "https://")) &&
+		(strings.Contains(raw, "rotgbapi") || strings.Contains(raw, "/gen?") || strings.Contains(raw, "ptype="))
+}
+
 // MaskProxyURL never returns a stored proxy password, even for invalid legacy data.
 func MaskProxyURL(raw string) string {
 	raw = strings.TrimSpace(raw)
@@ -1363,10 +1467,13 @@ func MaskProxyURL(raw string) string {
 	}
 	// The pool sentinel carries no credentials; surface it verbatim so the panel
 	// can restore the "IP 管理 pool" selection after save.
-	if raw == OpenAICodexTicketHarvestIPPoolURL {
+	if raw == OpenAICodexTicketHarvestIPPoolURL || isDynamicProxyAPIURL(raw) {
 		return raw
 	}
 	parsed, _ := url.Parse(raw)
+	if parsed == nil {
+		return raw
+	}
 	if parsed.User != nil {
 		if _, ok := parsed.User.Password(); ok {
 			parsed.User = url.UserPassword(parsed.User.Username(), "***")

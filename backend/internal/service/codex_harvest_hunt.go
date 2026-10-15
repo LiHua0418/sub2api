@@ -60,9 +60,16 @@ func (s *OpenAIGatewayService) huntCodexHarvestTicket(ctx context.Context, accou
 				break
 			}
 			proxy = poolExit.url
-		} else if proxy = s.openAICodexTicketHarvestProxyURLContext(ctx); proxy == "" {
+		} else {
+			proxy = s.openAICodexTicketHarvestProxyURLContext(ctx)
+		}
+		if proxy == "" {
+			proxy = openAIAccountProxyURL(account)
+		}
+		if proxy == "" {
 			return
 		}
+		logger.L().Info("codex_harvest hunting attempt", zap.Int("attempt", n+1), zap.String("model", model), zap.String("proxy", proxy))
 		token, _, err := s.GetAccessToken(ctx, account)
 		if err != nil || strings.TrimSpace(token) == "" {
 			last.Kind = "token_error"
@@ -123,17 +130,23 @@ func (s *OpenAIGatewayService) huntCodexHarvestTicket(ctx context.Context, accou
 		}
 		recordCodexHarvestProbe(account, model, result.Kind, nodeName, raw, result.Status, len(result.State), result.Shape.Blocks, openAICodexTicketTargetLength(account, cfg), codexHarvestExpectedBlocks(account, cfg))
 		if result.Kind == "success" {
-			s.openaiCodexTicketProbeCooldown.Delete(openAICodexTicketKey(account.ID, model))
 			ticket := codexHarvestTicket(account, model, result, cfg, attempts)
 			bindCodexHarvestEgress(ticket, attempt, session)
+
+			// 严格双重质检验收（糖果题验证 + 鹈鹕题创意标题验证）
+			if !s.QualifyCodexTicketFullBlood(ctx, account, token, model, ticket) {
+				continue
+			}
+
+			s.openaiCodexTicketProbeCooldown.Delete(openAICodexTicketKey(account.ID, model))
 			if err := s.storeOpenAICodexTicket(ctx, account, ticket); err != nil && s.codexHarvest != nil {
 				s.codexHarvest.degrade("ticket persisted in memory only; database write failed")
 			}
 			s.recordCodexProbe(ctx, account, model, result.Kind, result.Status)
-			logger.L().Info("openai_codex_ticket harvested", zap.Int64("account_id", account.ID), zap.String("model", model), zap.Int("attempts", attempts))
+			logger.L().Info("openai_codex_ticket harvested and VERIFIED FULL-BLOOD", zap.Int64("account_id", account.ID), zap.String("model", model), zap.Int("attempts", attempts), zap.String("gateway", ticket.Gateway))
 			return
 		}
-		if result.Terminal || result.Kind == "account_error" || result.Kind == "rate_limited" || (attempt.sidecar == nil && !pool) {
+		if result.Terminal || result.Kind == "account_error" || result.Kind == "rate_limited" {
 			break
 		}
 		if s.codexHarvest != nil {
@@ -149,12 +162,17 @@ func (s *OpenAIGatewayService) huntCodexHarvestTicket(ctx context.Context, accou
 	}
 	s.openaiCodexTicketProbeCooldown.Store(openAICodexTicketKey(account.ID, model), time.Now().Add(cooldown))
 	s.recordCodexProbe(ctx, account, model, last.Kind, last.Status)
-	logger.L().Info("openai_codex_ticket probe miss", zap.Int64("account_id", account.ID), zap.String("model", model), zap.String("reason", last.Kind), zap.Int("http", last.Status), zap.Int("attempts", attempts))
+	errMsg := ""
+	if last.Err != nil {
+		errMsg = last.Err.Error()
+	}
+	logger.L().Info("openai_codex_ticket probe miss", zap.Int64("account_id", account.ID), zap.String("model", model), zap.String("reason", last.Kind), zap.Int("http", last.Status), zap.Int("attempts", attempts), zap.String("err", errMsg))
 }
 
-// Without node learning a hunt makes a single attempt; an IP pool still
-// rotates to the next exit on failure, bounded by the same per-hunt budget.
 func harvestMaxNodeAttempts(controls CodexHarvestControls, pool bool) int {
+	if controls.Speed.MaxNodeAttempts > 0 {
+		return controls.Speed.MaxNodeAttempts
+	}
 	if controls.NodeMemoryEnabled || pool {
 		return max(1, controls.Speed.MaxNodeAttempts)
 	}

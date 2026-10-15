@@ -342,7 +342,7 @@ const prompt = ref(questionPrompt('candy'))
 // Claude accounts cannot serve the OpenAI default.
 const defaultModel = computed(() => props.account?.platform === 'anthropic' ? 'claude-opus-5-5' : 'gpt-6-astra')
 const modelId = ref(defaultModel.value)
-const reasoningEffort = ref('medium')
+const reasoningEffort = ref('high')
 const reasoningLevels = ref<string[]>(['low', 'medium', 'high'])
 const availableModels = ref<Array<{ id: string; display_name?: string }>>([])
 const modelOptions = computed(() => {
@@ -376,6 +376,9 @@ function selectQuestion(value: string | number | boolean | null) {
   if (running.value || (value !== 'candy' && value !== 'pelican')) return
   questionKind.value = value
   prompt.value = questionPrompt(value)
+  if (value === 'pelican') {
+    reasoningEffort.value = 'high'
+  }
 }
 const reasoningOptions = computed(() => reasoningLevels.value.map((value) => ({
   value,
@@ -554,7 +557,7 @@ async function consumeRun(run: TestRun, signal: AbortSignal) {
     },
     body: JSON.stringify({
       model_id: modelId.value.trim(),
-      prompt: `${prompt.value.trim()}\n\n${deliveryContract.value}`,
+      prompt: questionKind.value === 'pelican' ? prompt.value.trim() : `${prompt.value.trim()}\n\n${deliveryContract.value}`,
       mode: 'default',
       reasoning_effort: reasoningEffort.value
     }),
@@ -699,7 +702,7 @@ watch(() => [props.show, props.account?.id] as const, ([show]) => {
     questionKind.value = 'candy'
     prompt.value = questionPrompt('candy')
     modelId.value = defaultModel.value
-    reasoningEffort.value = 'medium'
+    reasoningEffort.value = 'high'
     parallelCount.value = 1
     runs.value = []
     controllers.get(PROBE_CONTROLLER_KEY)?.abort()

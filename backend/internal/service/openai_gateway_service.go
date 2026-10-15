@@ -476,6 +476,8 @@ type OpenAIGatewayService struct {
 	harvestIPPoolExits     []harvestIPPoolExit
 	harvestIPPoolSyncedAt  time.Time
 	harvestIPPoolCursor    atomic.Uint64
+	cachedDynamicProxyURL  string
+	cachedDynamicProxyExp  time.Time
 	codexHarvestRunMu      sync.RWMutex
 	accountRepo            AccountRepository
 	proxyRepo              ProxyRepository

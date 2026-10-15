@@ -732,6 +732,10 @@ func (s *OpenAIGatewayService) forwardExcelBPS(ctx context.Context, c *gin.Conte
 		if strings.HasPrefix(line, "data: ") {
 			payload := []byte(strings.TrimPrefix(line, "data: "))
 			kind := gjson.GetBytes(payload, "type").String()
+			if reduced, changed := ApplyOpenAICacheReductionToJSONBytes(c, payload); changed {
+				payload = reduced
+				line = "data: " + string(payload)
+			}
 			s.parseSSEUsageBytes(payload, &result.Usage)
 			if len(compactOutput) > 0 && (kind == "response.completed" || kind == "response.failed" || kind == "response.cancelled" || kind == "response.incomplete") {
 				subtractImagePolicyUsage(&result.Usage, compactUsage)

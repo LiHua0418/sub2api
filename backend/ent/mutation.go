@@ -22426,6 +22426,11 @@ type GroupMutation struct {
 	addprofit_min_margin                    *float64
 	profit_safety_buffer                    *float64
 	addprofit_safety_buffer                 *float64
+	cache_reduction_enabled                 *bool
+	cache_reduction_min_ratio               *float64
+	addcache_reduction_min_ratio            *float64
+	cache_reduction_max_ratio               *float64
+	addcache_reduction_max_ratio            *float64
 	clearedFields                           map[string]struct{}
 	api_keys                                map[int64]struct{}
 	removedapi_keys                         map[int64]struct{}
@@ -25848,6 +25853,154 @@ func (m *GroupMutation) ResetProfitSafetyBuffer() {
 	m.addprofit_safety_buffer = nil
 }
 
+// SetCacheReductionEnabled sets the "cache_reduction_enabled" field.
+func (m *GroupMutation) SetCacheReductionEnabled(b bool) {
+	m.cache_reduction_enabled = &b
+}
+
+// CacheReductionEnabled returns the value of the "cache_reduction_enabled" field in the mutation.
+func (m *GroupMutation) CacheReductionEnabled() (r bool, exists bool) {
+	v := m.cache_reduction_enabled
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCacheReductionEnabled returns the old "cache_reduction_enabled" field's value of the Group entity.
+// If the Group object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GroupMutation) OldCacheReductionEnabled(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCacheReductionEnabled is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCacheReductionEnabled requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCacheReductionEnabled: %w", err)
+	}
+	return oldValue.CacheReductionEnabled, nil
+}
+
+// ResetCacheReductionEnabled resets all changes to the "cache_reduction_enabled" field.
+func (m *GroupMutation) ResetCacheReductionEnabled() {
+	m.cache_reduction_enabled = nil
+}
+
+// SetCacheReductionMinRatio sets the "cache_reduction_min_ratio" field.
+func (m *GroupMutation) SetCacheReductionMinRatio(f float64) {
+	m.cache_reduction_min_ratio = &f
+	m.addcache_reduction_min_ratio = nil
+}
+
+// CacheReductionMinRatio returns the value of the "cache_reduction_min_ratio" field in the mutation.
+func (m *GroupMutation) CacheReductionMinRatio() (r float64, exists bool) {
+	v := m.cache_reduction_min_ratio
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCacheReductionMinRatio returns the old "cache_reduction_min_ratio" field's value of the Group entity.
+// If the Group object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GroupMutation) OldCacheReductionMinRatio(ctx context.Context) (v float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCacheReductionMinRatio is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCacheReductionMinRatio requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCacheReductionMinRatio: %w", err)
+	}
+	return oldValue.CacheReductionMinRatio, nil
+}
+
+// AddCacheReductionMinRatio adds f to the "cache_reduction_min_ratio" field.
+func (m *GroupMutation) AddCacheReductionMinRatio(f float64) {
+	if m.addcache_reduction_min_ratio != nil {
+		*m.addcache_reduction_min_ratio += f
+	} else {
+		m.addcache_reduction_min_ratio = &f
+	}
+}
+
+// AddedCacheReductionMinRatio returns the value that was added to the "cache_reduction_min_ratio" field in this mutation.
+func (m *GroupMutation) AddedCacheReductionMinRatio() (r float64, exists bool) {
+	v := m.addcache_reduction_min_ratio
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetCacheReductionMinRatio resets all changes to the "cache_reduction_min_ratio" field.
+func (m *GroupMutation) ResetCacheReductionMinRatio() {
+	m.cache_reduction_min_ratio = nil
+	m.addcache_reduction_min_ratio = nil
+}
+
+// SetCacheReductionMaxRatio sets the "cache_reduction_max_ratio" field.
+func (m *GroupMutation) SetCacheReductionMaxRatio(f float64) {
+	m.cache_reduction_max_ratio = &f
+	m.addcache_reduction_max_ratio = nil
+}
+
+// CacheReductionMaxRatio returns the value of the "cache_reduction_max_ratio" field in the mutation.
+func (m *GroupMutation) CacheReductionMaxRatio() (r float64, exists bool) {
+	v := m.cache_reduction_max_ratio
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCacheReductionMaxRatio returns the old "cache_reduction_max_ratio" field's value of the Group entity.
+// If the Group object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GroupMutation) OldCacheReductionMaxRatio(ctx context.Context) (v float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCacheReductionMaxRatio is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCacheReductionMaxRatio requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCacheReductionMaxRatio: %w", err)
+	}
+	return oldValue.CacheReductionMaxRatio, nil
+}
+
+// AddCacheReductionMaxRatio adds f to the "cache_reduction_max_ratio" field.
+func (m *GroupMutation) AddCacheReductionMaxRatio(f float64) {
+	if m.addcache_reduction_max_ratio != nil {
+		*m.addcache_reduction_max_ratio += f
+	} else {
+		m.addcache_reduction_max_ratio = &f
+	}
+}
+
+// AddedCacheReductionMaxRatio returns the value that was added to the "cache_reduction_max_ratio" field in this mutation.
+func (m *GroupMutation) AddedCacheReductionMaxRatio() (r float64, exists bool) {
+	v := m.addcache_reduction_max_ratio
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetCacheReductionMaxRatio resets all changes to the "cache_reduction_max_ratio" field.
+func (m *GroupMutation) ResetCacheReductionMaxRatio() {
+	m.cache_reduction_max_ratio = nil
+	m.addcache_reduction_max_ratio = nil
+}
+
 // AddAPIKeyIDs adds the "api_keys" edge to the APIKey entity by ids.
 func (m *GroupMutation) AddAPIKeyIDs(ids ...int64) {
 	if m.api_keys == nil {
@@ -26206,7 +26359,7 @@ func (m *GroupMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *GroupMutation) Fields() []string {
-	fields := make([]string, 0, 67)
+	fields := make([]string, 0, 70)
 	if m.created_at != nil {
 		fields = append(fields, group.FieldCreatedAt)
 	}
@@ -26408,6 +26561,15 @@ func (m *GroupMutation) Fields() []string {
 	if m.profit_safety_buffer != nil {
 		fields = append(fields, group.FieldProfitSafetyBuffer)
 	}
+	if m.cache_reduction_enabled != nil {
+		fields = append(fields, group.FieldCacheReductionEnabled)
+	}
+	if m.cache_reduction_min_ratio != nil {
+		fields = append(fields, group.FieldCacheReductionMinRatio)
+	}
+	if m.cache_reduction_max_ratio != nil {
+		fields = append(fields, group.FieldCacheReductionMaxRatio)
+	}
 	return fields
 }
 
@@ -26550,6 +26712,12 @@ func (m *GroupMutation) Field(name string) (ent.Value, bool) {
 		return m.ProfitMinMargin()
 	case group.FieldProfitSafetyBuffer:
 		return m.ProfitSafetyBuffer()
+	case group.FieldCacheReductionEnabled:
+		return m.CacheReductionEnabled()
+	case group.FieldCacheReductionMinRatio:
+		return m.CacheReductionMinRatio()
+	case group.FieldCacheReductionMaxRatio:
+		return m.CacheReductionMaxRatio()
 	}
 	return nil, false
 }
@@ -26693,6 +26861,12 @@ func (m *GroupMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldProfitMinMargin(ctx)
 	case group.FieldProfitSafetyBuffer:
 		return m.OldProfitSafetyBuffer(ctx)
+	case group.FieldCacheReductionEnabled:
+		return m.OldCacheReductionEnabled(ctx)
+	case group.FieldCacheReductionMinRatio:
+		return m.OldCacheReductionMinRatio(ctx)
+	case group.FieldCacheReductionMaxRatio:
+		return m.OldCacheReductionMaxRatio(ctx)
 	}
 	return nil, fmt.Errorf("unknown Group field %s", name)
 }
@@ -27171,6 +27345,27 @@ func (m *GroupMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetProfitSafetyBuffer(v)
 		return nil
+	case group.FieldCacheReductionEnabled:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCacheReductionEnabled(v)
+		return nil
+	case group.FieldCacheReductionMinRatio:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCacheReductionMinRatio(v)
+		return nil
+	case group.FieldCacheReductionMaxRatio:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCacheReductionMaxRatio(v)
+		return nil
 	}
 	return fmt.Errorf("unknown Group field %s", name)
 }
@@ -27260,6 +27455,12 @@ func (m *GroupMutation) AddedFields() []string {
 	if m.addprofit_safety_buffer != nil {
 		fields = append(fields, group.FieldProfitSafetyBuffer)
 	}
+	if m.addcache_reduction_min_ratio != nil {
+		fields = append(fields, group.FieldCacheReductionMinRatio)
+	}
+	if m.addcache_reduction_max_ratio != nil {
+		fields = append(fields, group.FieldCacheReductionMaxRatio)
+	}
 	return fields
 }
 
@@ -27322,6 +27523,10 @@ func (m *GroupMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedProfitMinMargin()
 	case group.FieldProfitSafetyBuffer:
 		return m.AddedProfitSafetyBuffer()
+	case group.FieldCacheReductionMinRatio:
+		return m.AddedCacheReductionMinRatio()
+	case group.FieldCacheReductionMaxRatio:
+		return m.AddedCacheReductionMaxRatio()
 	}
 	return nil, false
 }
@@ -27519,6 +27724,20 @@ func (m *GroupMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddProfitSafetyBuffer(v)
+		return nil
+	case group.FieldCacheReductionMinRatio:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddCacheReductionMinRatio(v)
+		return nil
+	case group.FieldCacheReductionMaxRatio:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddCacheReductionMaxRatio(v)
 		return nil
 	}
 	return fmt.Errorf("unknown Group numeric field %s", name)
@@ -27882,6 +28101,15 @@ func (m *GroupMutation) ResetField(name string) error {
 		return nil
 	case group.FieldProfitSafetyBuffer:
 		m.ResetProfitSafetyBuffer()
+		return nil
+	case group.FieldCacheReductionEnabled:
+		m.ResetCacheReductionEnabled()
+		return nil
+	case group.FieldCacheReductionMinRatio:
+		m.ResetCacheReductionMinRatio()
+		return nil
+	case group.FieldCacheReductionMaxRatio:
+		m.ResetCacheReductionMaxRatio()
 		return nil
 	}
 	return fmt.Errorf("unknown Group field %s", name)

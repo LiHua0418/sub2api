@@ -29,6 +29,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/geminicli"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai_compat"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/xai"
@@ -36,6 +37,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/tidwall/gjson"
+	"go.uber.org/zap"
 )
 
 // sseDataPrefix matches SSE data lines with optional whitespace after colon.
@@ -970,6 +972,7 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 		payload = createPelicanOpenAIPayload(upstreamTestModelID, isOAuth, options.prompt, options.reasoningEffort)
 	}
 	payloadBytes, _ := json.Marshal(payload)
+	logger.L().Info("account_test_service payload", zap.String("payload", string(payloadBytes)))
 
 	// Send test_start event once. A task-invalid Agent Identity response may
 	// restart this probe after registering a replacement task.
@@ -1018,6 +1021,19 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 		// 与真实转发一致：账号级自定义 UA 同样作为管理员显式配置传入，否则测试用的身份
 		// 与该账号真实出站的身份不是同一个（issue #3901 的配对不变式由收口保证）。
 		enforceCodexIdentityHeadersWithUA(req.Header, credentialAccount.GetOpenAIUserAgent())
+
+		if s.openaiGatewayService != nil {
+			_ = s.openaiGatewayService.applyOpenAICodexTicket(ctx, credentialAccount, upstreamTestModelID, req.Header)
+		}
+		req.Header.Set("OpenAI-Beta", "responses=experimental")
+		logger.L().Info("account_test_service request headers before sending",
+			zap.Int64("account_id", credentialAccount.ID),
+			zap.String("model", upstreamTestModelID),
+			zap.Int("turn_state_len", len(req.Header.Get(openAICodexTurnStateHeader))),
+			zap.String("cookie", req.Header.Get("Cookie")),
+			zap.String("session_id", req.Header.Get("session_id")),
+			zap.String("chatgpt_account_id", req.Header.Get("chatgpt-account-id")),
+		)
 	}
 
 	// 账号级请求头覆写：测试请求与真实转发保持一致的最终头
@@ -1029,18 +1045,62 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 	if account.ProxyID != nil && account.Proxy != nil {
 		proxyURL = account.Proxy.URL()
 	}
+	if isOAuth && proxyURL != "" {
+		proxyURL = rotateHarvestProxySession(proxyURL)
+	}
 
-	resp, err := s.doOpenAIAccountTestUpstream(req, proxyURL, account, true)
+	var releaseProxy func()
+	if isOAuth && !pelicanTestRequested(c) && openAIAccountProxyURL(credentialAccount) != "" && s.openaiGatewayService != nil {
+		if pinnedProxy, release, err := s.openaiGatewayService.pinCodexTicketEgress(req, credentialAccount, proxyURL); err == nil && pinnedProxy != "" {
+			proxyURL = pinnedProxy
+			releaseProxy = release
+		}
+	}
+	if releaseProxy != nil {
+		defer releaseProxy()
+	}
+
+	logger.L().Info("account_test_service dialing upstream",
+		zap.Int64("account_id", credentialAccount.ID),
+		zap.String("proxyURL", proxyURL),
+	)
+	var hdrKeys []string
+	for k := range req.Header {
+		hdrKeys = append(hdrKeys, k)
+	}
+	logger.L().Info("account_test_service header keys", zap.Strings("keys", hdrKeys))
+
+	var resp *http.Response
+	for attempt := 1; attempt <= 3; attempt++ {
+		resp, err = s.doOpenAIAccountTestUpstream(req, proxyURL, account, true)
+		if err == nil && resp != nil && resp.StatusCode == http.StatusOK {
+			break
+		}
+		if attempt < 3 {
+			if resp != nil {
+				_ = resp.Body.Close()
+			}
+			time.Sleep(time.Duration(attempt*2) * time.Second)
+		}
+	}
 	if err != nil {
 		return s.sendErrorAndEnd(c, fmt.Sprintf("Request failed: %s", err.Error()))
 	}
 	defer func() { _ = resp.Body.Close() }()
+	logger.L().Info("account_test_service received upstream response",
+		zap.Int("status", resp.StatusCode),
+		zap.String("safety_buffering", resp.Header.Get("x-codex-safety-buffering-faster-model")),
+		zap.String("turn_state", resp.Header.Get(openAICodexTurnStateHeader)),
+	)
 
 	if isOAuth && s.accountRepo != nil {
 		if updates, err := extractOpenAICodexProbeUpdates(resp); err == nil && len(updates) > 0 {
 			_ = s.accountRepo.UpdateExtra(ctx, account.ID, updates)
 			mergeAccountExtra(account, updates)
 		}
+	}
+	if isOAuth && s.openaiGatewayService != nil {
+		s.openaiGatewayService.observeCodexTicketResponse(req, resp, credentialAccount)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -1066,7 +1126,72 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 	}
 
 	// Process SSE stream
-	return s.processOpenAIStream(c, resp.Body)
+	c.Set("credential_account", credentialAccount)
+	c.Set("test_model_id", upstreamTestModelID)
+	return s.processOpenAIStream(c, resp.Body, prompt)
+}
+
+func (s *AccountTestService) mintFreshCodexTurnState(ctx context.Context, account *Account, token, model string, cookies []string) string {
+	if account == nil || token == "" || len(cookies) == 0 {
+		return ""
+	}
+	mintCtx, cancel := context.WithTimeout(ctx, 6*time.Second)
+	defer cancel()
+
+	payload := map[string]any{
+		"model":               model,
+		"instructions":        "",
+		"input": []map[string]any{
+			{
+				"type": "message",
+				"role": "user",
+				"content": []map[string]any{
+					{
+						"type": "input_text",
+						"text": "1",
+					},
+				},
+			},
+		},
+		"stream":              true,
+		"store":               false,
+		"parallel_tool_calls": true,
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return ""
+	}
+	req, err := http.NewRequestWithContext(mintCtx, http.MethodPost, chatgptCodexURL, bytes.NewReader(body))
+	if err != nil {
+		return ""
+	}
+	req.Close = true
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "text/event-stream")
+	req.Header.Set("OpenAI-Beta", "responses=experimental")
+	req.Header.Set("Cookie", strings.Join(cookies, "; "))
+	req.Header.Set("session_id", uuid.NewString())
+	_ = resolveAndSetOpenAIChatGPTAccountHeaders(mintCtx, s.accountRepo, req.Header, account)
+
+	proxy := openAIAccountProxyURL(account)
+	if proxy != "" {
+		applyOpenAICodexTicketHarvestIdentity(req.Header, model)
+	} else {
+		req.Header.Del("originator")
+		req.Header.Del("version")
+		req.Header.Del("user-agent")
+	}
+
+	resp, err := s.httpUpstream.Do(req, proxy, account.ID, account.Concurrency)
+	if err != nil || resp == nil {
+		return ""
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return ""
+	}
+	return resp.Header.Get(openAICodexTurnStateHeader)
 }
 
 func (s *AccountTestService) testExcelBPSAccountConnection(c *gin.Context, account *Account, modelID, prompt string) error {
@@ -3176,10 +3301,26 @@ func (s *AccountTestService) processOpenAIChatCompletionsStream(c *gin.Context, 
 }
 
 // processOpenAIStream processes the SSE stream from OpenAI Responses API
-func (s *AccountTestService) processOpenAIStream(c *gin.Context, body io.Reader) error {
+func (s *AccountTestService) processOpenAIStream(c *gin.Context, body io.Reader, prompts ...string) error {
+	prompt := ""
+	if len(prompts) > 0 {
+		prompt = prompts[0]
+	}
+	_ = prompt
+
 	reader := bufio.NewReader(body)
 	usage := startPelicanTestStream(c, "openai")
 	seenCompleted := false
+	hasDeltas := false
+	var fullOutput strings.Builder
+
+	sendChunk := func(chunk string) {
+		if chunk == "" {
+			return
+		}
+		s.sendEvent(c, TestEvent{Type: "content", Text: chunk})
+		fullOutput.WriteString(chunk)
+	}
 
 	for {
 		line, err := reader.ReadString('\n')
@@ -3195,7 +3336,16 @@ func (s *AccountTestService) processOpenAIStream(c *gin.Context, body io.Reader)
 		}
 
 		line = strings.TrimSpace(line)
-		if line == "" || !sseDataPrefix.MatchString(line) {
+		if line == "" {
+			continue
+		}
+		logger.L().Info("account_test_service raw sse line", zap.String("line", line))
+		if strings.HasPrefix(line, ":") {
+			_, _ = fmt.Fprint(c.Writer, ": keep-alive\n\n")
+			c.Writer.Flush()
+			continue
+		}
+		if !sseDataPrefix.MatchString(line) {
 			continue
 		}
 
@@ -3220,9 +3370,34 @@ func (s *AccountTestService) processOpenAIStream(c *gin.Context, body io.Reader)
 		case "response.output_text.delta":
 			// OpenAI Responses API uses "delta" field for text content
 			if delta, ok := data["delta"].(string); ok && delta != "" {
-				s.sendEvent(c, TestEvent{Type: "content", Text: delta})
+				sendChunk(delta)
+				hasDeltas = true
+			}
+		case "response.content_part.done":
+			if !hasDeltas {
+				if part, ok := data["part"].(map[string]any); ok {
+					if text, ok := part["text"].(string); ok && text != "" {
+						sendChunk(text)
+					}
+				}
+			}
+		case "response.output_item.done":
+			if !hasDeltas {
+				if item, ok := data["item"].(map[string]any); ok {
+					if contentList, ok := item["content"].([]any); ok {
+						for _, cItem := range contentList {
+							if cm, ok := cItem.(map[string]any); ok {
+								if text, ok := cm["text"].(string); ok && text != "" {
+									sendChunk(text)
+								}
+							}
+						}
+					}
+				}
 			}
 		case "response.completed", "response.done":
+			seenCompleted = true
+			logger.L().Info("account_test_service stream completed", zap.String("output", fullOutput.String()))
 			s.sendEvent(c, TestEvent{Type: "test_complete", Success: true})
 			return nil
 		case "response.failed":

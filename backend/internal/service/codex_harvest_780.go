@@ -12,6 +12,10 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
+	"github.com/google/uuid"
+	"go.uber.org/zap"
 )
 
 func codexTicketLifetime(length int) time.Duration {
@@ -41,8 +45,24 @@ func normalizeCodex780Gateway(target string) string {
 	return target
 }
 
+// Full-blood gateways known to deliver unconstrained Astra reasoning & high-detail outputs
+var fullBloodGateways = map[string]bool{
+	"unified-24":  true, // Frankfurt
+	"unified-209": true, // Western Europe
+	"unified-95":  true, // Tokyo
+	"unified-159": true, // Sydney
+}
+
 func codex780GatewayAllowed(actual, target string) bool {
-	return actual != "" && (target == "any" || actual == target)
+	if actual == "" {
+		return false
+	}
+	// Accept any gateway assigned by OpenAI edge when target is any, full_blood, or empty
+	if target == "any" || target == "*" || target == "" || target == "full_blood" {
+		return true
+	}
+	// Only restrict if administrator explicitly designated a specific single gateway (e.g. unified-88)
+	return actual == target
 }
 
 func codex780CookieGateway(cookies []string) string {
@@ -186,12 +206,12 @@ func (s *OpenAIGatewayService) requestCodex780Probe(ctx context.Context, account
 	}
 	target := controls.TargetGateway
 	if target == "" {
-		target = "unified-88"
+		target = "any"
 	}
 	out.Gateway = target
 	out.Transport = "sse"
 	out.EdgeIP = controls.EdgeIP
-	payload := []byte(`{"model":` + jsonString(model) + `,"instructions":"","stream":true,"store":false,"input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"ping"}]}],"reasoning":{"effort":"low"},"tool_choice":"auto","parallel_tool_calls":false}`)
+	payload := []byte(`{"model":` + jsonString(model) + `,"instructions":"","stream":true,"store":false,"input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"1"}]}],"reasoning":{"effort":"medium"},"tool_choice":"auto","parallel_tool_calls":false}`)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, chatgptCodexURL, bytes.NewReader(payload))
 	if err != nil {
 		out.Err = errors.New("cannot construct mint request")
@@ -203,9 +223,11 @@ func (s *OpenAIGatewayService) requestCodex780Probe(ctx context.Context, account
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "text/event-stream")
 	req.Header.Set("Accept-Encoding", "identity")
-	req.Header.Set("session-id", session)
-	req.Header.Set("User-Agent", "codex-tui/0.154.0 (Ubuntu 24.04; x86_64) OVH (codex-tui; 0.154.0)")
-	req.Header.Set("originator", "codex-tui")
+	if strings.TrimSpace(session) == "" {
+		session = uuid.NewString()
+	}
+	req.Header.Set("session_id", session)
+	applyOpenAICodexTicketHarvestIdentity(req.Header, model)
 	if err = resolveAndSetOpenAIChatGPTAccountHeaders(ctx, s.accountRepo, req.Header, account); err != nil {
 		out.Err = errors.New("account identity unavailable")
 		return
@@ -216,17 +238,25 @@ func (s *OpenAIGatewayService) requestCodex780Probe(ctx context.Context, account
 	if protocol == "" {
 		protocol = "sse"
 	}
-	key := codex780RouteKey(account, token, req.Header.Get("Chatgpt-Account-Id"), target, protocol)
-	seed, cached := s.codex780Routes.get(key, time.Now())
-	if !cached {
-		if ticket := s.lookupOpenAICodexTicket(account, model); ticket != nil && !ticket.Revoked {
-			seed, _, _ = codex780Route(ticket.HarvestCookies, target, time.Now())
+	key := codex780RouteKey(account, token, req.Header.Get("Chatgpt-Account-Id"), target, protocol, model)
+	var seed []string
+	if target != "any" && target != "full_blood" && target != "*" {
+		var cached bool
+		seed, cached = s.codex780Routes.get(key, time.Now())
+		if !cached {
+			if ticket := s.lookupOpenAICodexTicket(account, model); ticket != nil && !ticket.Revoked {
+				seed, _, _ = codex780Route(ticket.HarvestCookies, target, time.Now())
+			}
+		}
+		if len(seed) > 0 {
+			req.Header.Set("Cookie", strings.Join(seed, "; "))
 		}
 	}
-	if len(seed) > 0 {
-		req.Header.Set("Cookie", strings.Join(seed, "; "))
-	}
-	defer func() { s.codex780Routes.update(key, target, seed, out, time.Now()) }()
+	defer func() {
+		if target != "any" && target != "full_blood" && target != "*" {
+			s.codex780Routes.update(key, target, seed, out, time.Now())
+		}
+	}()
 	if ctx.Err() != nil || (reserve != nil && !reserve()) {
 		out.Err = errors.New("mint request no longer admitted")
 		return
@@ -247,6 +277,7 @@ func (s *OpenAIGatewayService) requestCodex780Probe(ctx context.Context, account
 		resp, err = s.httpUpstream.Do(req, proxy, account.ID, account.Concurrency)
 	}
 	if err != nil {
+		logger.L().Warn("codex_harvest_780 upstream.Do failed", zap.String("proxy", proxy), zap.Error(err))
 		if resp != nil && resp.Body != nil {
 			_ = resp.Body.Close()
 		}
@@ -276,10 +307,12 @@ func (s *OpenAIGatewayService) requestCodex780Probe(ctx context.Context, account
 		return
 	}
 	if err != nil {
+		logger.L().Warn("codex_harvest_780 ResponseRoute failed", zap.String("proxy", proxy), zap.Error(err))
 		out.Err = err
 		return
 	}
 	out.Gateway = codex780CookieGateway(out.Cookies)
+	logger.L().Info("codex_harvest_780 ResponseRoute OK", zap.String("proxy", proxy), zap.String("gateway", out.Gateway), zap.Int("cookies_len", len(out.Cookies)))
 	out.Err = modelErr
 	return
 }
@@ -296,6 +329,9 @@ func codex780ResponseRoute(resp *http.Response, seed []string, target string, no
 		incoming = append(incoming, cookie.Name+"="+cookie.Value)
 	}
 	if len(incoming) == 0 {
+		if target == "any" || target == "*" || target == "full_blood" {
+			return nil, mintRouteError("route_cookie_missing_from_upstream")
+		}
 		incoming = seed
 	}
 	// A changed pair must be complete; never combine old and new halves.

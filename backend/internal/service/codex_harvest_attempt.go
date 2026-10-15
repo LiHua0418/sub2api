@@ -55,7 +55,7 @@ func (s *OpenAIGatewayService) harvestControls(ctx context.Context) (CodexHarves
 		return v, saved
 	}
 	cfg := s.openAICodexTicketConfig()
-	return CodexHarvestControls{Version: 1, Speed: CodexHarvestSpeed{
+	return CodexHarvestControls{Version: 1, TargetGateway: "unified-88", Speed: CodexHarvestSpeed{
 		RoundIntervalSeconds:  cfg.HarvestProbeIntervalSeconds,
 		ProbeIntervalSeconds:  0,
 		AttemptTimeoutSeconds: cfg.HarvestAttemptTimeoutSeconds,
@@ -70,8 +70,8 @@ func (s *OpenAIGatewayService) harvestTicketConfig(ctx context.Context) config.O
 	cfg := s.openAICodexTicketConfig()
 	controls, _ := s.harvestControls(ctx)
 	applyHarvestSpeed(&cfg, controls.Speed)
-	if cfg.TargetLength == 780 && cfg.RefreshBeforeSeconds > 60 {
-		cfg.RefreshBeforeSeconds = 60
+	if cfg.TargetLength == 780 {
+		cfg.RefreshBeforeSeconds = 195
 	}
 	return cfg
 }
@@ -139,7 +139,8 @@ func pinnedHarvestNode(nodes []mihomo.HarvestNode, ticket *openAICodexTicket, tr
 func (s *OpenAIGatewayService) prepareHarvestAttempt(ctx context.Context, account *Account, model, proxy string, tried map[string]bool, controls CodexHarvestControls) (codexHarvestAttempt, bool) {
 	a := codexHarvestAttempt{proxy: proxy, release: func() {}}
 	pinned := s.lookupOpenAICodexTicket(account, model)
-	if pinned != nil && strings.TrimSpace(pinned.HarvestProxyURL) != "" && (!controls.NodeMemoryEnabled || s.codexHarvest == nil) {
+	settingProxy := s.openAICodexTicketHarvestProxySetting(ctx)
+	if pinned != nil && strings.TrimSpace(pinned.HarvestProxyURL) != "" && strings.TrimSpace(settingProxy) == "" && (!controls.NodeMemoryEnabled || s.codexHarvest == nil) && !isDynamicProxyAPIURL(settingProxy) {
 		a.proxy = pinned.HarvestProxyURL
 	}
 	if !controls.NodeMemoryEnabled || s.codexHarvest == nil {

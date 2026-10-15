@@ -350,6 +350,21 @@ func ProfitSafetyBuffer(v float64) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldProfitSafetyBuffer, v))
 }
 
+// CacheReductionEnabled applies equality check predicate on the "cache_reduction_enabled" field. It's identical to CacheReductionEnabledEQ.
+func CacheReductionEnabled(v bool) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldCacheReductionEnabled, v))
+}
+
+// CacheReductionMinRatio applies equality check predicate on the "cache_reduction_min_ratio" field. It's identical to CacheReductionMinRatioEQ.
+func CacheReductionMinRatio(v float64) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldCacheReductionMinRatio, v))
+}
+
+// CacheReductionMaxRatio applies equality check predicate on the "cache_reduction_max_ratio" field. It's identical to CacheReductionMaxRatioEQ.
+func CacheReductionMaxRatio(v float64) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldCacheReductionMaxRatio, v))
+}
+
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.
 func CreatedAtEQ(v time.Time) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldCreatedAt, v))
@@ -2663,6 +2678,96 @@ func ProfitSafetyBufferLT(v float64) predicate.Group {
 // ProfitSafetyBufferLTE applies the LTE predicate on the "profit_safety_buffer" field.
 func ProfitSafetyBufferLTE(v float64) predicate.Group {
 	return predicate.Group(sql.FieldLTE(FieldProfitSafetyBuffer, v))
+}
+
+// CacheReductionEnabledEQ applies the EQ predicate on the "cache_reduction_enabled" field.
+func CacheReductionEnabledEQ(v bool) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldCacheReductionEnabled, v))
+}
+
+// CacheReductionEnabledNEQ applies the NEQ predicate on the "cache_reduction_enabled" field.
+func CacheReductionEnabledNEQ(v bool) predicate.Group {
+	return predicate.Group(sql.FieldNEQ(FieldCacheReductionEnabled, v))
+}
+
+// CacheReductionMinRatioEQ applies the EQ predicate on the "cache_reduction_min_ratio" field.
+func CacheReductionMinRatioEQ(v float64) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldCacheReductionMinRatio, v))
+}
+
+// CacheReductionMinRatioNEQ applies the NEQ predicate on the "cache_reduction_min_ratio" field.
+func CacheReductionMinRatioNEQ(v float64) predicate.Group {
+	return predicate.Group(sql.FieldNEQ(FieldCacheReductionMinRatio, v))
+}
+
+// CacheReductionMinRatioIn applies the In predicate on the "cache_reduction_min_ratio" field.
+func CacheReductionMinRatioIn(vs ...float64) predicate.Group {
+	return predicate.Group(sql.FieldIn(FieldCacheReductionMinRatio, vs...))
+}
+
+// CacheReductionMinRatioNotIn applies the NotIn predicate on the "cache_reduction_min_ratio" field.
+func CacheReductionMinRatioNotIn(vs ...float64) predicate.Group {
+	return predicate.Group(sql.FieldNotIn(FieldCacheReductionMinRatio, vs...))
+}
+
+// CacheReductionMinRatioGT applies the GT predicate on the "cache_reduction_min_ratio" field.
+func CacheReductionMinRatioGT(v float64) predicate.Group {
+	return predicate.Group(sql.FieldGT(FieldCacheReductionMinRatio, v))
+}
+
+// CacheReductionMinRatioGTE applies the GTE predicate on the "cache_reduction_min_ratio" field.
+func CacheReductionMinRatioGTE(v float64) predicate.Group {
+	return predicate.Group(sql.FieldGTE(FieldCacheReductionMinRatio, v))
+}
+
+// CacheReductionMinRatioLT applies the LT predicate on the "cache_reduction_min_ratio" field.
+func CacheReductionMinRatioLT(v float64) predicate.Group {
+	return predicate.Group(sql.FieldLT(FieldCacheReductionMinRatio, v))
+}
+
+// CacheReductionMinRatioLTE applies the LTE predicate on the "cache_reduction_min_ratio" field.
+func CacheReductionMinRatioLTE(v float64) predicate.Group {
+	return predicate.Group(sql.FieldLTE(FieldCacheReductionMinRatio, v))
+}
+
+// CacheReductionMaxRatioEQ applies the EQ predicate on the "cache_reduction_max_ratio" field.
+func CacheReductionMaxRatioEQ(v float64) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldCacheReductionMaxRatio, v))
+}
+
+// CacheReductionMaxRatioNEQ applies the NEQ predicate on the "cache_reduction_max_ratio" field.
+func CacheReductionMaxRatioNEQ(v float64) predicate.Group {
+	return predicate.Group(sql.FieldNEQ(FieldCacheReductionMaxRatio, v))
+}
+
+// CacheReductionMaxRatioIn applies the In predicate on the "cache_reduction_max_ratio" field.
+func CacheReductionMaxRatioIn(vs ...float64) predicate.Group {
+	return predicate.Group(sql.FieldIn(FieldCacheReductionMaxRatio, vs...))
+}
+
+// CacheReductionMaxRatioNotIn applies the NotIn predicate on the "cache_reduction_max_ratio" field.
+func CacheReductionMaxRatioNotIn(vs ...float64) predicate.Group {
+	return predicate.Group(sql.FieldNotIn(FieldCacheReductionMaxRatio, vs...))
+}
+
+// CacheReductionMaxRatioGT applies the GT predicate on the "cache_reduction_max_ratio" field.
+func CacheReductionMaxRatioGT(v float64) predicate.Group {
+	return predicate.Group(sql.FieldGT(FieldCacheReductionMaxRatio, v))
+}
+
+// CacheReductionMaxRatioGTE applies the GTE predicate on the "cache_reduction_max_ratio" field.
+func CacheReductionMaxRatioGTE(v float64) predicate.Group {
+	return predicate.Group(sql.FieldGTE(FieldCacheReductionMaxRatio, v))
+}
+
+// CacheReductionMaxRatioLT applies the LT predicate on the "cache_reduction_max_ratio" field.
+func CacheReductionMaxRatioLT(v float64) predicate.Group {
+	return predicate.Group(sql.FieldLT(FieldCacheReductionMaxRatio, v))
+}
+
+// CacheReductionMaxRatioLTE applies the LTE predicate on the "cache_reduction_max_ratio" field.
+func CacheReductionMaxRatioLTE(v float64) predicate.Group {
+	return predicate.Group(sql.FieldLTE(FieldCacheReductionMaxRatio, v))
 }
 
 // HasAPIKeys applies the HasEdge predicate on the "api_keys" edge.

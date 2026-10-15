@@ -150,6 +150,12 @@ const (
 	FieldProfitMinMargin = "profit_min_margin"
 	// FieldProfitSafetyBuffer holds the string denoting the profit_safety_buffer field in the database.
 	FieldProfitSafetyBuffer = "profit_safety_buffer"
+	// FieldCacheReductionEnabled holds the string denoting the cache_reduction_enabled field in the database.
+	FieldCacheReductionEnabled = "cache_reduction_enabled"
+	// FieldCacheReductionMinRatio holds the string denoting the cache_reduction_min_ratio field in the database.
+	FieldCacheReductionMinRatio = "cache_reduction_min_ratio"
+	// FieldCacheReductionMaxRatio holds the string denoting the cache_reduction_max_ratio field in the database.
+	FieldCacheReductionMaxRatio = "cache_reduction_max_ratio"
 	// EdgeAPIKeys holds the string denoting the api_keys edge name in mutations.
 	EdgeAPIKeys = "api_keys"
 	// EdgeRedeemCodes holds the string denoting the redeem_codes edge name in mutations.
@@ -292,6 +298,9 @@ var Columns = []string{
 	FieldProfitControlEnabled,
 	FieldProfitMinMargin,
 	FieldProfitSafetyBuffer,
+	FieldCacheReductionEnabled,
+	FieldCacheReductionMinRatio,
+	FieldCacheReductionMaxRatio,
 }
 
 var (
@@ -439,6 +448,12 @@ var (
 	DefaultProfitMinMargin float64
 	// DefaultProfitSafetyBuffer holds the default value on creation for the "profit_safety_buffer" field.
 	DefaultProfitSafetyBuffer float64
+	// DefaultCacheReductionEnabled holds the default value on creation for the "cache_reduction_enabled" field.
+	DefaultCacheReductionEnabled bool
+	// DefaultCacheReductionMinRatio holds the default value on creation for the "cache_reduction_min_ratio" field.
+	DefaultCacheReductionMinRatio float64
+	// DefaultCacheReductionMaxRatio holds the default value on creation for the "cache_reduction_max_ratio" field.
+	DefaultCacheReductionMaxRatio float64
 )
 
 // OrderOption defines the ordering options for the Group queries.
@@ -742,6 +757,21 @@ func ByProfitMinMargin(opts ...sql.OrderTermOption) OrderOption {
 // ByProfitSafetyBuffer orders the results by the profit_safety_buffer field.
 func ByProfitSafetyBuffer(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldProfitSafetyBuffer, opts...).ToFunc()
+}
+
+// ByCacheReductionEnabled orders the results by the cache_reduction_enabled field.
+func ByCacheReductionEnabled(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCacheReductionEnabled, opts...).ToFunc()
+}
+
+// ByCacheReductionMinRatio orders the results by the cache_reduction_min_ratio field.
+func ByCacheReductionMinRatio(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCacheReductionMinRatio, opts...).ToFunc()
+}
+
+// ByCacheReductionMaxRatio orders the results by the cache_reduction_max_ratio field.
+func ByCacheReductionMaxRatio(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCacheReductionMaxRatio, opts...).ToFunc()
 }
 
 // ByAPIKeysCount orders the results by api_keys count.

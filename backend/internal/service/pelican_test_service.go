@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
 	"github.com/gin-gonic/gin"
@@ -49,7 +50,9 @@ func (s *AccountTestService) TestPelicanAccountConnection(c *gin.Context, accoun
 	options, _ := pelicanTestOptionsFromContext(c.Request.Context())
 	options.prompt = strings.TrimSpace(prompt)
 	options.reasoningEffort = normalizePelicanReasoningEffort(reasoningEffort)
-	ctx := withPelicanTestOptions(c.Request.Context(), options)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 450*time.Second)
+	defer cancel()
+	ctx = withPelicanTestOptions(ctx, options)
 	c.Request = c.Request.WithContext(ctx)
 	return s.TestAccountConnection(c, accountID, modelID, options.prompt, AccountTestModeDefault)
 }
@@ -125,17 +128,32 @@ func pelicanClaudeStopFailure(stopReason, category string) string {
 }
 
 func createPelicanOpenAIPayload(modelID string, isOAuth bool, prompt, reasoningEffort string) map[string]any {
-	payload := createOpenAITestPayload(modelID, isOAuth)
-	input, ok := payload["input"].([]map[string]any)
-	if ok && len(input) > 0 {
-		content, ok := input[0]["content"].([]map[string]any)
-		if ok && len(content) > 0 {
-			content[0]["text"] = promptOrDefault(prompt)
-		}
+	payload := map[string]any{
+		"model":               modelID,
+		"instructions":        "",
+		"parallel_tool_calls": true,
+		"input": []map[string]any{
+			{
+				"type": "message",
+				"role": "user",
+				"content": []map[string]any{
+					{
+						"type": "input_text",
+						"text": promptOrDefault(prompt),
+					},
+				},
+			},
+		},
+		"stream": true,
 	}
-	if effort := normalizePelicanReasoningEffort(reasoningEffort); effort != "" {
-		payload["reasoning"] = map[string]any{"effort": effort}
+	if isOAuth {
+		payload["store"] = false
 	}
+	effort := normalizePelicanReasoningEffort(reasoningEffort)
+	if effort == "" {
+		effort = "medium"
+	}
+	payload["reasoning"] = map[string]any{"effort": effort}
 	return payload
 }
 

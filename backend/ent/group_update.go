@@ -1232,6 +1232,62 @@ func (_u *GroupUpdate) AddProfitSafetyBuffer(v float64) *GroupUpdate {
 	return _u
 }
 
+// SetCacheReductionEnabled sets the "cache_reduction_enabled" field.
+func (_u *GroupUpdate) SetCacheReductionEnabled(v bool) *GroupUpdate {
+	_u.mutation.SetCacheReductionEnabled(v)
+	return _u
+}
+
+// SetNillableCacheReductionEnabled sets the "cache_reduction_enabled" field if the given value is not nil.
+func (_u *GroupUpdate) SetNillableCacheReductionEnabled(v *bool) *GroupUpdate {
+	if v != nil {
+		_u.SetCacheReductionEnabled(*v)
+	}
+	return _u
+}
+
+// SetCacheReductionMinRatio sets the "cache_reduction_min_ratio" field.
+func (_u *GroupUpdate) SetCacheReductionMinRatio(v float64) *GroupUpdate {
+	_u.mutation.ResetCacheReductionMinRatio()
+	_u.mutation.SetCacheReductionMinRatio(v)
+	return _u
+}
+
+// SetNillableCacheReductionMinRatio sets the "cache_reduction_min_ratio" field if the given value is not nil.
+func (_u *GroupUpdate) SetNillableCacheReductionMinRatio(v *float64) *GroupUpdate {
+	if v != nil {
+		_u.SetCacheReductionMinRatio(*v)
+	}
+	return _u
+}
+
+// AddCacheReductionMinRatio adds value to the "cache_reduction_min_ratio" field.
+func (_u *GroupUpdate) AddCacheReductionMinRatio(v float64) *GroupUpdate {
+	_u.mutation.AddCacheReductionMinRatio(v)
+	return _u
+}
+
+// SetCacheReductionMaxRatio sets the "cache_reduction_max_ratio" field.
+func (_u *GroupUpdate) SetCacheReductionMaxRatio(v float64) *GroupUpdate {
+	_u.mutation.ResetCacheReductionMaxRatio()
+	_u.mutation.SetCacheReductionMaxRatio(v)
+	return _u
+}
+
+// SetNillableCacheReductionMaxRatio sets the "cache_reduction_max_ratio" field if the given value is not nil.
+func (_u *GroupUpdate) SetNillableCacheReductionMaxRatio(v *float64) *GroupUpdate {
+	if v != nil {
+		_u.SetCacheReductionMaxRatio(*v)
+	}
+	return _u
+}
+
+// AddCacheReductionMaxRatio adds value to the "cache_reduction_max_ratio" field.
+func (_u *GroupUpdate) AddCacheReductionMaxRatio(v float64) *GroupUpdate {
+	_u.mutation.AddCacheReductionMaxRatio(v)
+	return _u
+}
+
 // AddAPIKeyIDs adds the "api_keys" edge to the APIKey entity by IDs.
 func (_u *GroupUpdate) AddAPIKeyIDs(ids ...int64) *GroupUpdate {
 	_u.mutation.AddAPIKeyIDs(ids...)
@@ -1933,6 +1989,21 @@ func (_u *GroupUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.AddedProfitSafetyBuffer(); ok {
 		_spec.AddField(group.FieldProfitSafetyBuffer, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.CacheReductionEnabled(); ok {
+		_spec.SetField(group.FieldCacheReductionEnabled, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.CacheReductionMinRatio(); ok {
+		_spec.SetField(group.FieldCacheReductionMinRatio, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedCacheReductionMinRatio(); ok {
+		_spec.AddField(group.FieldCacheReductionMinRatio, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.CacheReductionMaxRatio(); ok {
+		_spec.SetField(group.FieldCacheReductionMaxRatio, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedCacheReductionMaxRatio(); ok {
+		_spec.AddField(group.FieldCacheReductionMaxRatio, field.TypeFloat64, value)
 	}
 	if _u.mutation.APIKeysCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -3443,6 +3514,62 @@ func (_u *GroupUpdateOne) AddProfitSafetyBuffer(v float64) *GroupUpdateOne {
 	return _u
 }
 
+// SetCacheReductionEnabled sets the "cache_reduction_enabled" field.
+func (_u *GroupUpdateOne) SetCacheReductionEnabled(v bool) *GroupUpdateOne {
+	_u.mutation.SetCacheReductionEnabled(v)
+	return _u
+}
+
+// SetNillableCacheReductionEnabled sets the "cache_reduction_enabled" field if the given value is not nil.
+func (_u *GroupUpdateOne) SetNillableCacheReductionEnabled(v *bool) *GroupUpdateOne {
+	if v != nil {
+		_u.SetCacheReductionEnabled(*v)
+	}
+	return _u
+}
+
+// SetCacheReductionMinRatio sets the "cache_reduction_min_ratio" field.
+func (_u *GroupUpdateOne) SetCacheReductionMinRatio(v float64) *GroupUpdateOne {
+	_u.mutation.ResetCacheReductionMinRatio()
+	_u.mutation.SetCacheReductionMinRatio(v)
+	return _u
+}
+
+// SetNillableCacheReductionMinRatio sets the "cache_reduction_min_ratio" field if the given value is not nil.
+func (_u *GroupUpdateOne) SetNillableCacheReductionMinRatio(v *float64) *GroupUpdateOne {
+	if v != nil {
+		_u.SetCacheReductionMinRatio(*v)
+	}
+	return _u
+}
+
+// AddCacheReductionMinRatio adds value to the "cache_reduction_min_ratio" field.
+func (_u *GroupUpdateOne) AddCacheReductionMinRatio(v float64) *GroupUpdateOne {
+	_u.mutation.AddCacheReductionMinRatio(v)
+	return _u
+}
+
+// SetCacheReductionMaxRatio sets the "cache_reduction_max_ratio" field.
+func (_u *GroupUpdateOne) SetCacheReductionMaxRatio(v float64) *GroupUpdateOne {
+	_u.mutation.ResetCacheReductionMaxRatio()
+	_u.mutation.SetCacheReductionMaxRatio(v)
+	return _u
+}
+
+// SetNillableCacheReductionMaxRatio sets the "cache_reduction_max_ratio" field if the given value is not nil.
+func (_u *GroupUpdateOne) SetNillableCacheReductionMaxRatio(v *float64) *GroupUpdateOne {
+	if v != nil {
+		_u.SetCacheReductionMaxRatio(*v)
+	}
+	return _u
+}
+
+// AddCacheReductionMaxRatio adds value to the "cache_reduction_max_ratio" field.
+func (_u *GroupUpdateOne) AddCacheReductionMaxRatio(v float64) *GroupUpdateOne {
+	_u.mutation.AddCacheReductionMaxRatio(v)
+	return _u
+}
+
 // AddAPIKeyIDs adds the "api_keys" edge to the APIKey entity by IDs.
 func (_u *GroupUpdateOne) AddAPIKeyIDs(ids ...int64) *GroupUpdateOne {
 	_u.mutation.AddAPIKeyIDs(ids...)
@@ -4174,6 +4301,21 @@ func (_u *GroupUpdateOne) sqlSave(ctx context.Context) (_node *Group, err error)
 	}
 	if value, ok := _u.mutation.AddedProfitSafetyBuffer(); ok {
 		_spec.AddField(group.FieldProfitSafetyBuffer, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.CacheReductionEnabled(); ok {
+		_spec.SetField(group.FieldCacheReductionEnabled, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.CacheReductionMinRatio(); ok {
+		_spec.SetField(group.FieldCacheReductionMinRatio, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedCacheReductionMinRatio(); ok {
+		_spec.AddField(group.FieldCacheReductionMinRatio, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.CacheReductionMaxRatio(); ok {
+		_spec.SetField(group.FieldCacheReductionMaxRatio, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedCacheReductionMaxRatio(); ok {
+		_spec.AddField(group.FieldCacheReductionMaxRatio, field.TypeFloat64, value)
 	}
 	if _u.mutation.APIKeysCleared() {
 		edge := &sqlgraph.EdgeSpec{

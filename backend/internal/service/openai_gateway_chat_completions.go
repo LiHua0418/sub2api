@@ -791,6 +791,9 @@ func (s *OpenAIGatewayService) handleChatStreamingResponse(
 
 	processDataLine := func(payload string) bool {
 		payload = string(restoreCodexToolNamesFromContext(c, []byte(payload)))
+		if reduced, changed := ApplyOpenAICacheReductionToJSONBytes(c, []byte(payload)); changed {
+			payload = string(reduced)
+		}
 		if firstChunk {
 			firstChunk = false
 			ms := int(time.Since(startTime).Milliseconds())

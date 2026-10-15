@@ -28,11 +28,14 @@ func TestCodex780RouteSurvivesModelMismatchAndSharesAcrossModels(t *testing.T) {
 			require.Empty(t, req.Header.Get("Cookie"))
 			header["Set-Cookie"] = append(append([]string{}, pair...), "session=DO_NOT_CACHE")
 			declared = "gpt-6-luna"
-		case 2, 3:
+		case 2:
 			require.Equal(t, strings.Join(pair, "; "), req.Header.Get("Cookie"))
-			if calls == 3 {
-				declared = "gpt-6-sol"
-			}
+			declared = "gpt-6-astra"
+		case 3:
+			// gpt-6-sol has isolated route cache
+			require.Empty(t, req.Header.Get("Cookie"))
+			header["Set-Cookie"] = pair
+			declared = "gpt-6-sol"
 		default:
 			require.Empty(t, req.Header.Get("Cookie"), "credentials and accounts must be isolated")
 			header["Set-Cookie"] = pair
@@ -56,7 +59,7 @@ func TestCodex780RouteCacheExpiryInvalidationAndBounds(t *testing.T) {
 	now := time.Now().Truncate(time.Second)
 	var cache codex780RouteCache
 	a := ticketTestAccount(1)
-	key := codex780RouteKey(a, "token", "account", "unified-88", "sse")
+	key := codex780RouteKey(a, "token", "account", "unified-88", "sse", "gpt-6-astra")
 	pair := mint780Pair(now.Add(time.Hour), "unified-88")
 	good := codexHarvestProbeResult{Sent: true, Status: 200, Cookies: pair}
 	cache.update(key, "unified-88", nil, good, now)
@@ -67,10 +70,11 @@ func TestCodex780RouteCacheExpiryInvalidationAndBounds(t *testing.T) {
 	again, _ := cache.get(key, now)
 	require.Equal(t, pair, again, "callers cannot mutate cached cookies")
 	for _, other := range [][32]byte{
-		codex780RouteKey(a, "other", "account", "unified-88", "sse"),
-		codex780RouteKey(a, "token", "other", "unified-88", "sse"),
-		codex780RouteKey(a, "token", "account", "unified-95", "sse"),
-		codex780RouteKey(a, "token", "account", "unified-88", "websocket"),
+		codex780RouteKey(a, "other", "account", "unified-88", "sse", "gpt-6-astra"),
+		codex780RouteKey(a, "token", "other", "unified-88", "sse", "gpt-6-astra"),
+		codex780RouteKey(a, "token", "account", "unified-95", "sse", "gpt-6-astra"),
+		codex780RouteKey(a, "token", "account", "unified-88", "websocket", "gpt-6-astra"),
+		codex780RouteKey(a, "token", "account", "unified-88", "sse", "gpt-6-sol"),
 	} {
 		_, found := cache.get(other, now)
 		require.False(t, found)
@@ -96,7 +100,7 @@ func TestCodex780RouteCacheExpiryInvalidationAndBounds(t *testing.T) {
 	var wg sync.WaitGroup
 	for i := range codex780RouteCacheLimit + 20 {
 		wg.Go(func() {
-			k := codex780RouteKey(a, fmt.Sprint(i), "account", "unified-88", "sse")
+			k := codex780RouteKey(a, fmt.Sprint(i), "account", "unified-88", "sse", "gpt-6-astra")
 			cache.update(k, "unified-88", nil, good, now)
 			cache.get(k, now)
 		})
@@ -108,7 +112,7 @@ func TestCodex780RouteCacheExpiryInvalidationAndBounds(t *testing.T) {
 func TestCodex780RouteCacheRejectsOffTargetAndUnsentResults(t *testing.T) {
 	var cache codex780RouteCache
 	now := time.Now()
-	key := codex780RouteKey(ticketTestAccount(1), "token", "account", "unified-88", "sse")
+	key := codex780RouteKey(ticketTestAccount(1), "token", "account", "unified-88", "sse", "gpt-6-astra")
 	for _, result := range []codexHarvestProbeResult{
 		{Sent: true, Status: 200, Cookies: mint780Pair(now.Add(time.Hour), "unified-95")},
 		{Sent: true, Status: 200, Cookies: mint780Pair(now.Add(-time.Second), "unified-88")},

@@ -64,15 +64,7 @@ func restoreBoundCodexTicketHarvestIdentity(h http.Header, ticket *openAICodexTi
 	if h == nil || ticket == nil {
 		return
 	}
-	if ticket.Length == 780 {
-		h.Del(responsesLiteHeaderKey)
-		if codexTicketCookiesFresh(ticket, time.Now()) {
-			h.Set("Cookie", strings.Join(ticket.HarvestCookies, "; "))
-		} else {
-			h.Del("Cookie")
-		}
-		return
-	}
+	h.Del(responsesLiteHeaderKey)
 	prevBeta := strings.TrimSpace(h.Get("OpenAI-Beta"))
 	if session := harvestTicketSessionID(ticket); session != "" {
 		h.Set("session_id", session)
@@ -92,7 +84,7 @@ func restoreBoundCodexTicketHarvestIdentity(h http.Header, ticket *openAICodexTi
 	for _, key := range boundCodexTicketHarvestStrippedHeaders {
 		h.Del(key)
 	}
-	if ticket.HarvestLite {
+	if ticket.Length != 780 && ticket.HarvestLite {
 		h.Set(responsesLiteHeaderKey, "true")
 	}
 	if prevBeta == openAIWSBetaV1Value || prevBeta == openAIWSBetaV2Value {
@@ -105,6 +97,11 @@ func (s *OpenAIGatewayService) restoreBoundCodexTicketHarvestIdentity(ctx contex
 		return
 	}
 	restoreBoundCodexTicketHarvestIdentity(h, s.boundCodexTicketFromHeader(ctx, h, account))
+	if account != nil && openAIAccountProxyURL(account) == "" {
+		h.Del("originator")
+		h.Del("version")
+		h.Del("user-agent")
+	}
 }
 
 // Harvest probes send session_id on the header only: no prompt_cache_key and
@@ -306,10 +303,8 @@ func (s *OpenAIGatewayService) codexTicketPinsEgressFromHeader(ctx context.Conte
 	if ticket == nil {
 		return false
 	}
-	return strings.TrimSpace(ticket.HarvestProxyURL) != "" ||
-		strings.TrimSpace(ticket.HarvestNodeID) != "" ||
-		strings.TrimSpace(ticket.HarvestNodeName) != "" ||
-		s.openAICodexTicketHarvestFixedProxyURL(ctx) != ""
+	return strings.TrimSpace(ticket.HarvestNodeID) != "" ||
+		strings.TrimSpace(ticket.HarvestNodeName) != ""
 }
 
 func (s *OpenAIGatewayService) pinCodexTicketEgress(req *http.Request, account *Account, proxyURL string) (string, func(), error) {
@@ -332,13 +327,16 @@ func (s *OpenAIGatewayService) pinCodexTicketEgressFromHeader(ctx context.Contex
 	}
 	pinned := strings.TrimSpace(ticket.HarvestProxyURL)
 	if pinned == "" {
-		pinned = s.openAICodexTicketHarvestFixedProxyURL(ctx)
-	}
-	if pinned == "" {
 		return proxyURL, noop, nil
 	}
+	// If the ticket was harvested through a specific proxy, generation requests
+	// bound to this ticket must route through the same proxy egress to ensure
+	// OpenAI Anycast reaches the identical edge gateway pod.
 	if strings.TrimSpace(ticket.HarvestNodeID) == "" && strings.TrimSpace(ticket.HarvestNodeName) == "" {
-		return pinned, noop, nil
+		if pinned != "" {
+			return pinned, noop, nil
+		}
+		return proxyURL, noop, nil
 	}
 	if ticket.HarvestNodeProvider == "managed" {
 		proxy, release, err := mihomo.PinNode(ctx, ticket.HarvestNodeID)

@@ -214,8 +214,8 @@ func ValidateCodexHarvestControls(v CodexHarvestControls) error {
 	if v.Transport != "sse" && v.Transport != "websocket" {
 		return errors.New("transport must be sse or websocket")
 	}
-	if v.TargetGateway != "any" && !regexp.MustCompile(`^unified-[0-9]{1,5}$`).MatchString(v.TargetGateway) {
-		return errors.New("target_gateway must be any, unified-N or chat.gateway.unified-N.api.openai.com")
+	if v.TargetGateway != "any" && v.TargetGateway != "full_blood" && !regexp.MustCompile(`^unified-[0-9]{1,5}$`).MatchString(v.TargetGateway) {
+		return errors.New("target_gateway must be any, full_blood, unified-N or chat.gateway.unified-N.api.openai.com")
 	}
 	if v.Version != 1 {
 		return errors.New("unsupported harvest settings version")

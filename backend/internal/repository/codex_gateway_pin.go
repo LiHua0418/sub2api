@@ -95,13 +95,25 @@ func (s *codexGatewayPinUpstream) DoWithTLS(req *http.Request, proxy string, acc
 		} else {
 			received := time.Now()
 			route := codexGatewayRouteFromResponse(resp, req.URL.Path, received, s.config.TTLSeconds)
+			if route == nil && req.Header.Get("Cookie") != "" {
+				for _, c := range req.Cookies() {
+					if c.Name == "__oailb" && c.Value != "" {
+						ttl := s.config.TTLSeconds
+						if ttl < 30 || ttl > 86400 {
+							ttl = 3600
+						}
+						route = &codexGatewayRoute{cookie: *c, expires: received.Add(time.Duration(ttl) * time.Second)}
+						break
+					}
+				}
+			}
 			if route != nil {
 				route.proxy = proxy
 				route.node = egress.node
 			}
 			ttl := s.config.TTLSeconds
 			if ttl == 0 {
-				ttl = 230
+				ttl = 3600
 			}
 			if route != nil && !route.expires.IsZero() && route.expires.After(received.Add(time.Duration(ttl)*time.Second)) {
 				route.expires = received.Add(time.Duration(ttl) * time.Second)
@@ -147,7 +159,7 @@ func codexGatewayCookiePathMatches(path, scope string) bool {
 
 func codexGatewayRouteFromResponse(resp *http.Response, path string, now time.Time, configuredTTL ...int) *codexGatewayRoute {
 	ttl := 230
-	if len(configuredTTL) > 0 && configuredTTL[0] >= 30 && configuredTTL[0] <= 240 {
+	if len(configuredTTL) > 0 && configuredTTL[0] >= 30 && configuredTTL[0] <= 86400 {
 		ttl = configuredTTL[0]
 	}
 	var route *codexGatewayRoute
