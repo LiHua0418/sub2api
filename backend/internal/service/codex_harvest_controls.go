@@ -23,6 +23,7 @@ type CodexHarvestSpeed struct {
 	MaxRequestsPerRound   int `json:"max_requests_per_round"`
 	MaxNodeAttempts       int `json:"max_node_attempts"`
 	RefreshBeforeSeconds  int `json:"refresh_before_seconds"`
+	MaxConcurrentWorkers  int `json:"max_concurrent_workers,omitempty"` // 账号独立多协程并发打票数（支持两三百号大规模并发）
 }
 
 type CodexHarvestBound struct {

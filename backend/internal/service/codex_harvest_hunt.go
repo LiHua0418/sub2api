@@ -61,7 +61,7 @@ func (s *OpenAIGatewayService) huntCodexHarvestTicket(ctx context.Context, accou
 			}
 			proxy = poolExit.url
 		} else {
-			proxy = s.openAICodexTicketHarvestProxyURLContext(ctx)
+			proxy = s.openAICodexTicketHarvestProxyURLContext(ctx, account.ID)
 		}
 		if proxy == "" {
 			proxy = openAIAccountProxyURL(account)

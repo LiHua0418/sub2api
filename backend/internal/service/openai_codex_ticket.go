@@ -389,7 +389,7 @@ func (s *OpenAIGatewayService) openAICodexTicketHarvestFixedProxyURL(ctx context
 	return proxy
 }
 
-func (s *OpenAIGatewayService) openAICodexTicketHarvestProxyURLContext(ctx context.Context) string {
+func (s *OpenAIGatewayService) openAICodexTicketHarvestProxyURLContext(ctx context.Context, accountID ...int64) string {
 	proxy := s.openAICodexTicketHarvestProxySetting(ctx)
 	if proxy == OpenAICodexTicketHarvestIPPoolURL {
 		exit, _ := s.pickHarvestIPPoolExit(ctx, nil)
@@ -401,14 +401,18 @@ func (s *OpenAIGatewayService) openAICodexTicketHarvestProxyURLContext(ctx conte
 			return resolved
 		}
 	}
-	return rotateHarvestProxySession(proxy)
+	var aid int64
+	if len(accountID) > 0 {
+		aid = accountID[0]
+	}
+	return rotateHarvestProxySessionWithAccount(proxy, aid)
 }
 
 // harvestRegions 轮转全球各大区，避免死磕某一受灾国家节点；严格排除中国大陆(CN)、香港(HK)与澳门(MO)
 var harvestRegions = []string{"US", "GB", "FR", "DE", "NL", "CA", "SG", "JP", "AU", "BR", "SE", "NO", "CH", "IT", "NZ", "KR", "TW"}
 var harvestRegionIdx uint64
 
-func rotateHarvestProxySession(rawProxy string) string {
+func rotateHarvestProxySessionWithAccount(rawProxy string, accountID int64) string {
 	rawProxy = strings.TrimSpace(rawProxy)
 	if rawProxy == "" || (!strings.Contains(rawProxy, "trustsource.live") && !strings.Contains(rawProxy, "rotgb")) {
 		return rawProxy
@@ -419,7 +423,7 @@ func rotateHarvestProxySession(rawProxy string) string {
 	}
 	user := u.User.Username()
 	pass, _ := u.User.Password()
-	sessID := fmt.Sprintf("h%d", time.Now().UnixNano()%1000000)
+	sessID := fmt.Sprintf("acc%d_%d", accountID, time.Now().UnixNano()%1000000)
 
 	// 轮转全球各大区，避免死磕某一受灾国家节点
 	idx := atomic.AddUint64(&harvestRegionIdx, 1)
@@ -440,6 +444,10 @@ func rotateHarvestProxySession(rawProxy string) string {
 	}
 	u.User = url.UserPassword(user, pass)
 	return u.String()
+}
+
+func rotateHarvestProxySession(rawProxy string) string {
+	return rotateHarvestProxySessionWithAccount(rawProxy, 0)
 }
 
 func (s *OpenAIGatewayService) resolveDynamicAPIProxy(ctx context.Context, apiURL string) (string, error) {
@@ -1256,8 +1264,7 @@ func (s *OpenAIGatewayService) refreshOpenAICodexTickets(ctx context.Context) {
 		return
 	}
 	defer s.codexHarvestRoundActive.Store(false)
-	controls, configured := s.harvestControls(ctx)
-	legacyParallel := !configured && !controls.NodeMemoryEnabled
+	controls, _ := s.harvestControls(ctx)
 	round := &codexHarvestRound{limit: controls.Speed.MaxRequestsPerRound}
 	ctx = context.WithValue(ctx, codexHarvestRoundKey{}, round)
 	if s.codexHarvest != nil {
@@ -1344,13 +1351,19 @@ func (s *OpenAIGatewayService) refreshOpenAICodexTickets(ctx context.Context) {
 		}
 		start := int(cursor.Load() % uint64(total))
 		before, scheduled := round.Used(), 0
+		// 现代化账号独立并发打票池：彻底废除串行阻塞与全局单号排队饥饿
+		// 允许配置并发打票协程数（默认 20，最高 100），实现秒级全池补票覆盖
+		maxConcurrency := controls.Speed.MaxConcurrentWorkers
+		if maxConcurrency <= 0 {
+			maxConcurrency = 20
+		} else if maxConcurrency > 100 {
+			maxConcurrency = 100
+		}
+		sem := make(chan struct{}, maxConcurrency)
 		var wg sync.WaitGroup
-		for offset := 0; offset < total && round.Used() < round.limit && ctx.Err() == nil; offset++ {
-			if legacyParallel && scheduled >= round.limit-before {
-				break
-			}
+
+		for offset := 0; offset < total && ctx.Err() == nil; offset++ {
 			index := (start + offset) % total
-			cursor.Store(uint64((index + 1) % total))
 			account := pool[index/len(cfg.Models)]
 			model := normalizeOpenAICodexTicketModel(cfg.Models[index%len(cfg.Models)])
 			if model == "" || s.ticketProbeCoolingDown(account.ID, model, now) {
@@ -1366,18 +1379,20 @@ func (s *OpenAIGatewayService) refreshOpenAICodexTickets(ctx context.Context) {
 			acc := account
 			acc.Extra = maps.Clone(account.Extra)
 			acc.Credentials = maps.Clone(account.Credentials)
-			if legacyParallel {
-				scheduled++
-				wg.Add(1)
-				go func(acc Account, model string) {
-					defer wg.Done()
-					s.probeOnceOpenAICodexTicket(ctx, &acc, model)
-				}(acc, model)
-			} else {
-				s.probeOnceOpenAICodexTicket(ctx, &acc, model)
-			}
+
+			scheduled++
+			wg.Add(1)
+			sem <- struct{}{}
+			go func(acc Account, targetModel string) {
+				defer func() {
+					<-sem
+					wg.Done()
+				}()
+				s.probeOnceOpenAICodexTicket(ctx, &acc, targetModel)
+			}(acc, model)
 		}
 		wg.Wait()
+		cursor.Store(uint64((start + scheduled) % total))
 		if tier.Schedulable {
 			counts[0] += round.Used() - before
 		} else {
