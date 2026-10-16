@@ -440,12 +440,9 @@
             <div v-if="row.fingerprint_summary" class="flex items-center">
               <button
                 @click="handleShowFingerprint(row)"
-                class="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs font-medium text-gray-700 transition hover:border-primary-300 hover:bg-primary-50 hover:text-primary-600 dark:border-dark-600 dark:bg-dark-700/60 dark:text-gray-200 dark:hover:border-primary-500 dark:hover:bg-primary-950/30 dark:hover:text-primary-400"
+                class="inline-flex items-center rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs font-medium text-gray-700 transition hover:border-primary-300 hover:bg-primary-50 hover:text-primary-600 dark:border-dark-600 dark:bg-dark-700/60 dark:text-gray-200 dark:hover:border-primary-500 dark:hover:bg-primary-950/30 dark:hover:text-primary-400"
                 :title="'点击查看完整设备指纹画像: ' + row.fingerprint_summary.device_model"
               >
-                <!-- OS Icon -->
-                <span v-if="row.fingerprint_summary.os_name === 'macOS'" class="text-[13px]"></span>
-                <span v-else class="text-[11px] text-blue-500">⊞</span>
                 <span class="max-w-[8.5rem] truncate font-medium">{{ row.fingerprint_summary.device_model }}</span>
               </button>
             </div>
