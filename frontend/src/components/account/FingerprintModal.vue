@@ -218,7 +218,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { getFingerprint, type AccountFingerprintResponse } from '@/api/admin/accounts'
-import { useAppStore } from '@/stores/app'
+import { useClipboard } from '@/composables/useClipboard'
 
 const props = defineProps<{
   show: boolean
@@ -229,7 +229,7 @@ const emit = defineEmits<{
   (e: 'close'): void
 }>()
 
-const appStore = useAppStore()
+const { copyToClipboard } = useClipboard()
 const loading = ref(false)
 const error = ref<string | null>(null)
 const data = ref<AccountFingerprintResponse | null>(null)
@@ -261,11 +261,6 @@ watch(
 
 const copyText = async (text: string) => {
   if (!text) return
-  try {
-    await navigator.clipboard.writeText(text)
-    appStore.showSuccess('已复制到剪贴板')
-  } catch {
-    appStore.showError('复制失败')
-  }
+  await copyToClipboard(text, '已复制到剪贴板')
 }
 </script>
