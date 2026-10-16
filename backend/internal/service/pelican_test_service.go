@@ -154,7 +154,6 @@ func createPelicanOpenAIPayload(modelID string, isOAuth bool, prompt, reasoningE
 		effort = "medium"
 	}
 	payload["reasoning"] = map[string]any{"effort": effort}
-	payload["reasoning_effort"] = effort
 	return payload
 }
 

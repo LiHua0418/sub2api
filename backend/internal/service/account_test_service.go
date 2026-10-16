@@ -971,15 +971,6 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 	if options, ok := pelicanTestOptionsFromContext(ctx); ok {
 		payload = createPelicanOpenAIPayload(upstreamTestModelID, isOAuth, options.prompt, options.reasoningEffort)
 	}
-
-	// 为 OAuth 账号测试请求打通真实的 client_metadata 设备指纹环境，确保测试与真实转发环境 100% 对齐
-	if isOAuth && credentialAccount != nil {
-		fpIDs := resolveCodexFingerprintIDs(credentialAccount, "", codexFingerprintSession)
-		if fpIDs != nil {
-			applyCodexFingerprintClientMetadata(payload, fpIDs)
-		}
-	}
-
 	payloadBytes, _ := json.Marshal(payload)
 	logger.L().Info("account_test_service payload", zap.String("payload", string(payloadBytes)))
 
@@ -1033,11 +1024,6 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 
 		if s.openaiGatewayService != nil {
 			_ = s.openaiGatewayService.applyOpenAICodexTicket(ctx, credentialAccount, upstreamTestModelID, req.Header)
-		}
-		// 确保测试请求的标头与当前账号的指纹 IDs（时区、W3C 遥测追踪等）100% 对齐
-		fpIDs := resolveCodexFingerprintIDs(credentialAccount, "", codexFingerprintSession)
-		if fpIDs != nil {
-			applyCodexFingerprintHeaders(req.Header, fpIDs)
 		}
 		req.Header.Set("OpenAI-Beta", "responses=experimental")
 		logger.L().Info("account_test_service request headers before sending",
