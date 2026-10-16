@@ -112,14 +112,14 @@ func stripCodexFingerprintSeed(extra map[string]any) map[string]any {
 
 func codexFingerprintModeFromExtra(extra map[string]any) codexFingerprintMode {
 	if extra == nil {
-		return codexFingerprintSession // 默认开启 session 级拟真指纹收敛
+		return codexFingerprintOff
 	}
 	raw, _ := extra[codexFingerprintModeExtraKey].(string)
 	switch codexFingerprintMode(strings.TrimSpace(raw)) {
 	case codexFingerprintOff, codexFingerprintDevice, codexFingerprintSession, codexFingerprintFull:
 		return codexFingerprintMode(strings.TrimSpace(raw))
 	default:
-		return codexFingerprintSession // 未显式关闭时，默认自动收敛并生成前三项环境指纹
+		return codexFingerprintOff
 	}
 }
 
@@ -188,7 +188,12 @@ func ShouldEnsureCodexFingerprintSeedForExtraUpdates(updates map[string]any) boo
 	if updates == nil {
 		return false
 	}
-	return codexFingerprintModeRequiresSeed(codexFingerprintModeFromExtra(updates))
+	raw, exists := updates[codexFingerprintModeExtraKey]
+	if !exists {
+		return false
+	}
+	modeStr, _ := raw.(string)
+	return codexFingerprintModeRequiresSeed(codexFingerprintMode(strings.TrimSpace(modeStr)))
 }
 
 // GetCodexFingerprintMode 从账号 extra JSON 读取指纹收敛模式。

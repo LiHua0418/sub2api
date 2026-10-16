@@ -225,12 +225,8 @@ func ProbeOpenAICodexStateRoute(ctx context.Context, upstream HTTPUpstream, temp
 			resp, err := upstream.DoWithTLS(req, proxy, accountID, concurrency, profile)
 			if resp != nil {
 				for _, got := range resp.Cookies() {
-					if got.Name == "__oailb" {
-						pinnedGW := codex780CookieGateway([]string{pinned.String()})
-						gotGW := codex780CookieGateway([]string{got.String()})
-						if pinnedGW != "" && gotGW != "" && pinnedGW != gotGW {
-							routeChanged = true
-						}
+					if got.Name == "__oailb" && (got.Value != pinned.Value || got.MaxAge < 0 || (!got.Expires.IsZero() && !time.Now().Before(got.Expires))) {
+						routeChanged = true
 					}
 				}
 			}

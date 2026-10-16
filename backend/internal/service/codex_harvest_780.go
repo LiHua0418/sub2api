@@ -14,13 +14,12 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
-	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
 func codexTicketLifetime(length int) time.Duration {
 	if length == 780 {
-		return openAICodexCredentialTTL
+		return 240 * time.Second
 	}
 	return time.Hour - 30*time.Second
 }
@@ -223,9 +222,7 @@ func (s *OpenAIGatewayService) requestCodex780Probe(ctx context.Context, account
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "text/event-stream")
 	req.Header.Set("Accept-Encoding", "identity")
-	if strings.TrimSpace(session) == "" {
-		session = uuid.NewString()
-	}
+	req.Header.Set("session-id", session)
 	req.Header.Set("session_id", session)
 	applyOpenAICodexTicketHarvestIdentity(req.Header, model)
 	if err = resolveAndSetOpenAIChatGPTAccountHeaders(ctx, s.accountRepo, req.Header, account); err != nil {

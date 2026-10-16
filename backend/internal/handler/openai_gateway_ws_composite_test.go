@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/tlsfingerprint"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	coderws "github.com/coder/websocket"
 	"github.com/stretchr/testify/require"
@@ -25,6 +26,10 @@ func (r *compositeWSRouteRepo) ListByGroup(context.Context, int64, bool) ([]serv
 type compositeWSHTTPUpstream struct{ service.HTTPUpstream }
 
 func (*compositeWSHTTPUpstream) Do(req *http.Request, _ string, _ int64, _ int) (*http.Response, error) {
+	return http.DefaultClient.Do(req)
+}
+
+func (*compositeWSHTTPUpstream) DoWithTLS(req *http.Request, _ string, _ int64, _ int, _ *tlsfingerprint.Profile) (*http.Response, error) {
 	return http.DefaultClient.Do(req)
 }
 

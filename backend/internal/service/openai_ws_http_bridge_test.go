@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/tlsfingerprint"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/xai"
 	coderws "github.com/coder/websocket"
 	"github.com/gin-gonic/gin"
@@ -41,6 +42,10 @@ type contextAwareBridgeUpstream struct {
 func (u *contextAwareBridgeUpstream) Do(req *http.Request, proxyURL string, accountID int64, concurrency int) (*http.Response, error) {
 	context.AfterFunc(req.Context(), func() { _ = u.writer.CloseWithError(req.Context().Err()) })
 	return u.httpUpstreamRecorder.Do(req, proxyURL, accountID, concurrency)
+}
+
+func (u *contextAwareBridgeUpstream) DoWithTLS(req *http.Request, proxyURL string, accountID int64, concurrency int, _ *tlsfingerprint.Profile) (*http.Response, error) {
+	return u.Do(req, proxyURL, accountID, concurrency)
 }
 
 func TestProxyOpenAIWSHTTPBridgeSilentDisconnectBoundsDrain(t *testing.T) {

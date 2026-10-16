@@ -96,7 +96,11 @@ func (s *OpenAIGatewayService) restoreBoundCodexTicketHarvestIdentity(ctx contex
 	if s == nil {
 		return
 	}
-	restoreBoundCodexTicketHarvestIdentity(h, s.boundCodexTicketFromHeader(ctx, h, account))
+	ticket := s.boundCodexTicketFromHeader(ctx, h, account)
+	if ticket == nil {
+		return
+	}
+	restoreBoundCodexTicketHarvestIdentity(h, ticket)
 	if account != nil && openAIAccountProxyURL(account) == "" {
 		h.Del("originator")
 		h.Del("version")
@@ -303,8 +307,10 @@ func (s *OpenAIGatewayService) codexTicketPinsEgressFromHeader(ctx context.Conte
 	if ticket == nil {
 		return false
 	}
-	return strings.TrimSpace(ticket.HarvestNodeID) != "" ||
-		strings.TrimSpace(ticket.HarvestNodeName) != ""
+	return strings.TrimSpace(ticket.HarvestProxyURL) != "" ||
+		strings.TrimSpace(ticket.HarvestNodeID) != "" ||
+		strings.TrimSpace(ticket.HarvestNodeName) != "" ||
+		s.openAICodexTicketHarvestFixedProxyURL(ctx) != ""
 }
 
 func (s *OpenAIGatewayService) pinCodexTicketEgress(req *http.Request, account *Account, proxyURL string) (string, func(), error) {
@@ -326,6 +332,9 @@ func (s *OpenAIGatewayService) pinCodexTicketEgressFromHeader(ctx context.Contex
 		return proxyURL, noop, nil
 	}
 	pinned := strings.TrimSpace(ticket.HarvestProxyURL)
+	if pinned == "" {
+		pinned = s.openAICodexTicketHarvestFixedProxyURL(ctx)
+	}
 	if pinned == "" {
 		return proxyURL, noop, nil
 	}

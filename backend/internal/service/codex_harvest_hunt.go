@@ -169,10 +169,9 @@ func (s *OpenAIGatewayService) huntCodexHarvestTicket(ctx context.Context, accou
 	logger.L().Info("openai_codex_ticket probe miss", zap.Int64("account_id", account.ID), zap.String("model", model), zap.String("reason", last.Kind), zap.Int("http", last.Status), zap.Int("attempts", attempts), zap.String("err", errMsg))
 }
 
+// Without node learning a hunt makes a single attempt; an IP pool still
+// rotates to the next exit on failure, bounded by the same per-hunt budget.
 func harvestMaxNodeAttempts(controls CodexHarvestControls, pool bool) int {
-	if controls.Speed.MaxNodeAttempts > 0 {
-		return controls.Speed.MaxNodeAttempts
-	}
 	if controls.NodeMemoryEnabled || pool {
 		return max(1, controls.Speed.MaxNodeAttempts)
 	}

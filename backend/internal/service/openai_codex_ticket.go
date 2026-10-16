@@ -37,7 +37,7 @@ const (
 	openAICodexTicketDefaultSolModel = "gpt-5.6-sol"
 	openAICodexTicketPersonalBlocks  = 10
 	openAICodexTicketTeamBlocks      = 12
-	openAICodexCredentialTTL         = 1800 * time.Second
+	openAICodexCredentialTTL         = 240 * time.Second
 )
 
 // ErrOpenAICodexTicketUnavailable 表示该号该模型没有可用的 292 门票，
@@ -768,10 +768,11 @@ func (s *OpenAIGatewayService) storeOpenAICodexTicket(ctx context.Context, accou
 	defer s.openaiCodexTicketStateMu.Unlock()
 	model := normalizeOpenAICodexTicketModel(ticket.Model)
 	ticket.Identity = ticketIdentity(account)
-	if current := s.lookupCodexTicketLocked(account, model); current != nil && current.valid(time.Now(), openAICodexTicketTargetLength(account, s.openAICodexTicketConfig())) && current.State != ticket.State {
-		// 新打出并通过严格质检的高质量票必须立刻作为 Primary 激活生效！
-		// 旧票降级保存为 Standby 备用，杜绝旧票/陈旧上下文继续霸占 Primary 导致降智。
-		ticket.Standby = current
+	if current := s.lookupCodexTicketLocked(account, model); current.valid(time.Now(), openAICodexTicketTargetLength(account, s.openAICodexTicketConfig())) && current.State != ticket.State {
+		copy := *current
+		copy.Standby = ticket
+		ticket = &copy
+		standby = true
 	}
 	ticket.Model = model
 	ticket.AccountID = account.ID
@@ -797,7 +798,7 @@ func (s *OpenAIGatewayService) storeOpenAICodexTicket(ctx context.Context, accou
 }
 
 func harvestTicketSessionID(ticket *openAICodexTicket) string {
-	if ticket == nil {
+	if ticket == nil || ticket.Length == 780 {
 		return ""
 	}
 	return strings.TrimSpace(ticket.HarvestSessionID)
@@ -839,10 +840,13 @@ func (s *OpenAIGatewayService) applyOpenAICodexTicket(ctx context.Context, accou
 		return nil
 	}
 	model = normalizeOpenAICodexTicketModel(model)
-	if model == "" {
+	if model == "" || !s.openAICodexTicketGatedModel(model) {
 		return nil
 	}
 	cfg := s.openAICodexTicketConfig()
+	if !openAICodexSkipHarvest(account) && cfg.FailClosed && s.openAICodexTicketHarvestExcluded(account) {
+		return denyOpenAITicket()
+	}
 	ticket := s.lookupOpenAICodexTicket(account, model)
 	if ticket.valid(time.Now(), openAICodexTicketTargetLength(account, cfg)) {
 		protocol := "sse"
@@ -870,7 +874,13 @@ func (s *OpenAIGatewayService) applyOpenAICodexTicket(ctx context.Context, accou
 		}
 		return nil
 	}
-	return nil
+	if openAICodexSkipHarvest(account) {
+		return nil
+	}
+	if !cfg.FailClosed {
+		return nil
+	}
+	return denyOpenAITicket()
 }
 
 // openAICodexTicketOutboundModel 预测本请求真正出站的模型名，也就是
@@ -1362,7 +1372,10 @@ func (s *OpenAIGatewayService) refreshOpenAICodexTickets(ctx context.Context) {
 		sem := make(chan struct{}, maxConcurrency)
 		var wg sync.WaitGroup
 
-		for offset := 0; offset < total && ctx.Err() == nil; offset++ {
+		for offset := 0; offset < total && round.Used() < round.limit && ctx.Err() == nil; offset++ {
+			if scheduled >= round.limit-before {
+				break
+			}
 			index := (start + offset) % total
 			account := pool[index/len(cfg.Models)]
 			model := normalizeOpenAICodexTicketModel(cfg.Models[index%len(cfg.Models)])

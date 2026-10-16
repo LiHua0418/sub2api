@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/tlsfingerprint"
 	coderws "github.com/coder/websocket"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
@@ -122,6 +123,10 @@ func (u *gatedBridgeFailoverUpstream) Do(req *http.Request, proxy string, accoun
 		return nil, req.Context().Err()
 	}
 	return u.httpUpstreamRecorder.Do(req, proxy, account, concurrency)
+}
+
+func (u *gatedBridgeFailoverUpstream) DoWithTLS(req *http.Request, proxy string, account int64, concurrency int, _ *tlsfingerprint.Profile) (*http.Response, error) {
+	return u.Do(req, proxy, account, concurrency)
 }
 
 func TestOpenAIWSFailoverGateRejectsDepartedClient(t *testing.T) {

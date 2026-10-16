@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/tlsfingerprint"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/Wei-Shaw/sub2api/internal/testutil"
 	coderws "github.com/coder/websocket"
@@ -61,6 +62,17 @@ func (u *bridgeRealTransport) Do(req *http.Request, proxy string, account int64,
 	// rather than net/http's automatic gzip decoding.
 	req.Header.Set("Accept-Encoding", u.encoding)
 	resp, err := u.HTTPUpstream.Do(req, proxy, account, concurrency)
+	if err != nil {
+		return nil, err
+	}
+	u.body.ReadCloser = resp.Body
+	resp.Body = u.body
+	return resp, nil
+}
+
+func (u *bridgeRealTransport) DoWithTLS(req *http.Request, proxy string, account int64, concurrency int, profile *tlsfingerprint.Profile) (*http.Response, error) {
+	req.Header.Set("Accept-Encoding", u.encoding)
+	resp, err := u.HTTPUpstream.DoWithTLS(req, proxy, account, concurrency, profile)
 	if err != nil {
 		return nil, err
 	}

@@ -1659,6 +1659,9 @@ func (s *OpenAIGatewayService) listSchedulableAccounts(ctx context.Context, grou
 		}
 		return accounts, nil
 	}
+	if s.accountRepo == nil {
+		return nil, nil
+	}
 	var accounts []Account
 	var err error
 	if s.cfg != nil && s.cfg.RunMode == config.RunModeSimple {

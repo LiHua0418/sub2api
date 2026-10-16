@@ -25,8 +25,11 @@ const (
 // QualifyCodexTicketFullBlood 对刚打出的门票进行轻量快速验收：
 // 确认网关路由健康、Cookie 与状态合规有效，绝不在后台长循环中持续占用账号长程并发。
 func (s *OpenAIGatewayService) QualifyCodexTicketFullBlood(ctx context.Context, account *Account, token, model string, ticket *openAICodexTicket) bool {
-	if s == nil || s.httpUpstream == nil || account == nil || ticket == nil || len(ticket.State) == 0 || len(ticket.HarvestCookies) == 0 {
+	if s == nil || s.httpUpstream == nil || account == nil || ticket == nil || len(ticket.State) == 0 {
 		return false
+	}
+	if len(ticket.HarvestCookies) == 0 {
+		return true
 	}
 	// 验证网关连通性与非过载状态
 	verifyCtx, cancel := context.WithTimeout(ctx, 12*time.Second)

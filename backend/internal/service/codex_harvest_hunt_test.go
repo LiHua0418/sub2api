@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/tlsfingerprint"
 	"github.com/stretchr/testify/require"
 )
 
@@ -339,6 +340,10 @@ type harvestProxyUpstream struct {
 }
 
 func (u *harvestProxyUpstream) Do(req *http.Request, proxy string, _ int64, _ int) (*http.Response, error) {
+	return u.do(req, proxy)
+}
+
+func (u *harvestProxyUpstream) DoWithTLS(req *http.Request, proxy string, _ int64, _ int, _ *tlsfingerprint.Profile) (*http.Response, error) {
 	return u.do(req, proxy)
 }
 
