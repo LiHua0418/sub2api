@@ -299,25 +299,13 @@ func resolveCodexFingerprintIDs(account *Account, clientSessionID string, mode c
 		turnStartedAtUnixMs: time.Now().UnixMilli(),
 	}
 
-	// 派生前三项真实美国个人电脑环境指纹 (硬件/系统平台、本地时区、系统语言链)
-	h := sha256.Sum256([]byte(fmt.Sprintf("%d:%s:desktop_v1", account.ID, seed)))
-	seedNum := binary.BigEndian.Uint64(h[:8])
-
-	isMac := (seedNum % 10) < 6 // 60% Mac, 40% Windows
-	if isMac {
-		ids.secPlatform = "macOS"
-		ids.userAgent = "codex_cli_rs/0.162.1 (Macintosh; Intel Mac OS X 10_15_7) xterm-256color"
-	} else {
-		ids.secPlatform = "Windows"
-		ids.userAgent = "codex_cli_rs/0.162.1 (Windows NT 10.0; Win64; x64) xterm-256color"
-	}
-
-	timezones := []string{"America/Los_Angeles", "America/New_York", "America/Chicago"}
-	ids.clientTimezone = timezones[(seedNum>>8)%uint64(len(timezones))]
-
-	languages := []string{"en-US,en;q=0.9", "en-US,en;q=0.9,es;q=0.8"}
-	ids.acceptLanguage = languages[(seedNum>>12)%uint64(len(languages))]
-	ids.chromeMajor = "128"
+	// 采用工业级硬件与环境基因库派生真实美国个人电脑画像
+	hwProfile := ResolveHardwareProfile(account.ID, seed)
+	ids.secPlatform = hwProfile.SecPlatform
+	ids.userAgent = fmt.Sprintf("codex_cli_rs/0.162.1 (%s) xterm-256color", hwProfile.PlatformUA)
+	ids.clientTimezone = hwProfile.Timezone
+	ids.acceptLanguage = hwProfile.AcceptLanguage
+	ids.chromeMajor = hwProfile.ChromeMajor
 
 	ids.installationID = resolveConvergedInstallationID(account, seed)
 	if ids.installationID == "" {
