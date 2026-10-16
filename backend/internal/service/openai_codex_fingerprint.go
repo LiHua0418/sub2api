@@ -346,6 +346,8 @@ func resolveCodexFingerprintIDs(account *Account, clientSessionID string, mode c
 		}
 		ids.turnID = uuid.Must(uuid.NewV7()).String()
 		ids.windowID = ids.threadID + ":0"
+		// 动态演变链路: 同一会话保持 trace_id 确定自洽，子 span_id 随轮次交互自然步进
+		ids.traceparent = DeriveTraceparent(account.ID, seed, ids.sessionID, ids.turnStartedAtUnixMs)
 		return ids
 
 	case codexFingerprintFull:
@@ -353,6 +355,7 @@ func resolveCodexFingerprintIDs(account *Account, clientSessionID string, mode c
 		ids.threadID = ids.sessionID
 		ids.turnID = uuid.Must(uuid.NewV7()).String()
 		ids.windowID = ids.threadID + ":0"
+		ids.traceparent = DeriveTraceparent(account.ID, seed, ids.sessionID, ids.turnStartedAtUnixMs)
 		return ids
 	}
 

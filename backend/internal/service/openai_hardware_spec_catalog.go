@@ -168,6 +168,19 @@ func ResolveHardwareProfile(accountID int64, seed string) HardwareProfile {
 	return p
 }
 
+// DeriveTraceparent 依据会话标识确定性派生 W3C Trace Context (trace_id 随会话稳定，span_id 随轮次步进演化)
+func DeriveTraceparent(accountID int64, seed, sessionID string, turnStartedAtUnixMs int64) string {
+	// 会话级主 Trace ID: 32位合法十六进制，同会话/Session 恒定
+	hTrace := sha256.Sum256([]byte(fmt.Sprintf("%d:%s:%s:trace_root", accountID, seed, sessionID)))
+	traceID := fmt.Sprintf("%032x", hTrace[:16])
+
+	// 轮次级动态 Span ID: 16位合法十六进制，由该轮交互的时间戳和会话确定性演化
+	hSpan := sha256.Sum256([]byte(fmt.Sprintf("%s:%d:span_node", traceID, turnStartedAtUnixMs)))
+	spanID := fmt.Sprintf("%016x", hSpan[:8])
+
+	return fmt.Sprintf("00-%s-%s-01", traceID, spanID)
+}
+
 // ApplyToRequestHeaders 统一将该画像注入 HTTP Headers (完全纯净原生终端契约，绝对无任何浏览器专属头)
 func (p HardwareProfile) ApplyToRequestHeaders(h http.Header, version string) {
 	if h == nil {
