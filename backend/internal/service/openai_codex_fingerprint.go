@@ -425,9 +425,12 @@ func applyCodexFingerprintHeaders(h http.Header, ids *codexFingerprintIDs) {
 	if ids.traceparent != "" {
 		h.Set("traceparent", ids.traceparent)
 	}
-	if ids.baggage != "" {
-		h.Set("baggage", ids.baggage)
+	// 动态对齐 baggage 中的 sentry-release 与当前生效的 User-Agent 版本
+	version := codexClientVersionFromUA(ids.userAgent)
+	if version == "" {
+		version = "0.162.1"
 	}
+	h.Set("baggage", fmt.Sprintf("sentry-environment=production,sentry-release=codex-cli@%s,sentry-user_id=%s", version, ids.username))
 
 	rewriteCodexTurnMetadataFields(h, map[string]any{
 		"installation_id":         ids.installationID,

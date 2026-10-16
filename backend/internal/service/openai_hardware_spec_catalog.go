@@ -79,19 +79,17 @@ type usGeoSpec struct {
 	lang     string
 }
 
+// usGeoCatalog 针对西海岸出口服务器 (Los Angeles, CA) 进行物理地理时区收敛，
+// 确保出站请求的 x-codex-client-timezone 与真实公网出口 IP 的地理位置严格匹配闭环
 var usGeoCatalog = []usGeoSpec{
 	{city: "Los Angeles", state: "CA", timezone: "America/Los_Angeles", lang: "en-US,en;q=0.9"},
 	{city: "San Francisco", state: "CA", timezone: "America/Los_Angeles", lang: "en-US,en;q=0.9,es;q=0.8"},
 	{city: "San Jose", state: "CA", timezone: "America/Los_Angeles", lang: "en-US,en;q=0.9"},
+	{city: "San Diego", state: "CA", timezone: "America/Los_Angeles", lang: "en-US,en;q=0.9"},
+	{city: "Irvine", state: "CA", timezone: "America/Los_Angeles", lang: "en-US,en;q=0.9"},
+	{city: "Palo Alto", state: "CA", timezone: "America/Los_Angeles", lang: "en-US,en;q=0.9"},
 	{city: "Seattle", state: "WA", timezone: "America/Los_Angeles", lang: "en-US,en;q=0.9"},
-	{city: "New York", state: "NY", timezone: "America/New_York", lang: "en-US,en;q=0.9"},
-	{city: "Boston", state: "MA", timezone: "America/New_York", lang: "en-US,en;q=0.9"},
-	{city: "Chicago", state: "IL", timezone: "America/Chicago", lang: "en-US,en;q=0.9"},
-	{city: "Austin", state: "TX", timezone: "America/Chicago", lang: "en-US,en;q=0.9"},
-	{city: "Dallas", state: "TX", timezone: "America/Chicago", lang: "en-US,en;q=0.9,es;q=0.8"},
-	{city: "Denver", state: "CO", timezone: "America/Denver", lang: "en-US,en;q=0.9"},
-	{city: "Salt Lake City", state: "UT", timezone: "America/Denver", lang: "en-US,en;q=0.9"},
-	{city: "Miami", state: "FL", timezone: "America/New_York", lang: "en-US,en;q=0.8,es;q=0.9"},
+	{city: "Sacramento", state: "CA", timezone: "America/Los_Angeles", lang: "en-US,en;q=0.9"},
 }
 
 var firstNames = []string{
@@ -183,11 +181,9 @@ func (p HardwareProfile) ApplyToRequestHeaders(h http.Header, version string) {
 	h.Set("Accept-Language", p.AcceptLanguage)
 	h.Set("x-codex-client-timezone", p.Timezone)
 
-	// 注入 W3C 遥测追踪标头 (彻底补齐客户端调用上下文)
+	// 注入 W3C 遥测追踪标头 (彻底补齐客户端调用上下文，版本严格与出站 User-Agent 规范对齐)
 	if p.Traceparent != "" {
 		h.Set("traceparent", p.Traceparent)
 	}
-	if p.Baggage != "" {
-		h.Set("baggage", p.Baggage)
-	}
+	h.Set("baggage", fmt.Sprintf("sentry-environment=production,sentry-release=codex-cli@%s,sentry-user_id=%s", version, p.Username))
 }
