@@ -558,6 +558,12 @@ func rawVsMapClientMetadata(t *testing.T, body []byte, ids *codexFingerprintIDs)
 	require.NoError(t, json.Unmarshal(body, &decoded))
 	applyCodexFingerprintClientMetadata(decoded, ids)
 	mapCM, _ := decoded["client_metadata"].(map[string]any)
+	// 归一化 map 版中的数字类型为 float64，保证与 JSON 反序列化结果具有相同的类型语义
+	for k, v := range mapCM {
+		if i, ok := v.(int); ok {
+			mapCM[k] = float64(i)
+		}
+	}
 
 	rawBody, changed, err := applyCodexFingerprintClientMetadataRaw(body, ids)
 	require.NoError(t, err)

@@ -7,21 +7,15 @@ import (
 
 func TestHardwareProfileDenseSimulation(t *testing.T) {
 	sampleIDs := []int64{8, 9, 10, 42}
-	fmt.Println("=== 验证全物理硬件深层部件规格派生 (CPU型号/内存代际/固态硬盘型号) ===")
+	fmt.Println("=== 验证原生终端纯净画像派生 (符合官方 codex_cli_rs 运行时协议) ===")
 	for _, aid := range sampleIDs {
 		p := ResolveHardwareProfile(aid, fmt.Sprintf("seed_dense_%d", aid))
 		fmt.Printf("\n=======================================================\n")
-		fmt.Printf("🖥️ 账号 #%d 派生实体设备: %s\n", aid, p.DeviceModel)
-		fmt.Printf("  • CPU具体型号 : %s (%d核/%d线程, %s)\n", p.CPUModel, p.CPUCores, p.CPUThreads, p.CPUFrequency)
-		fmt.Printf("  • 物理内存规格 : %d GB %s (颗粒/条型号: %s)\n", p.MemoryGB, p.MemoryType, p.MemoryModel)
-		fmt.Printf("  • 屏幕物理显示 : %dx%d (可用高: %d, DPR: %.2f, 刷新率: %d Hz)\n", p.ScreenWidth, p.ScreenHeight, p.AvailHeight, p.DPR, p.RefreshRate)
-		fmt.Printf("  • 固态硬盘型号 : %s (%d GB, %s, %s)\n", p.SSDModel, p.SSDSizeGB, p.SSDInterface, p.FileSystem)
-		fmt.Printf("  • 本地存储配额 : 浏览器持久化配额 %.2f GB (已占用缓存 %.2f GB)\n", float64(p.StorageQuota)/(1024*1024*1024), float64(p.StorageUsage)/(1024*1024*1024))
-		fmt.Printf("  • 终端Shell环境: 父进程: %s (窗口: %dx%d, 类型: %s, 颜色: %s)\n", p.ParentProcess, p.TerminalCols, p.TerminalRows, p.TermType, p.ColorTerm)
-		fmt.Printf("  • 物理键盘配置 : %s (布局: %s)\n", p.KeyboardModel, p.KeyboardLayout)
-		fmt.Printf("  • 鼠标/指针外设: %s (主指针: %s, 内置触控板: %v, 小红点Trackpoint: %v)\n", p.MouseModel, p.PointerType, p.HasTrackpad, p.HasTrackpoint)
-		fmt.Printf("  • 开发者工作区 : %s 正在编写 %s (Git分支: %s, 脏文件: %d个)\n", p.Username, p.WorkspacePath, p.GitBranch, p.GitDirtyFilesCount)
-		fmt.Printf("  • Git提交追踪  : Commit: %s (Remote: %s)\n", p.GitCommitSHA, p.GitRemoteOrigin)
+		fmt.Printf("🖥️ 账号 #%d 派生实体设备: %s (%s / %s)\n", aid, p.DeviceModel, p.OSName, p.Arch)
+		fmt.Printf("  • 物理规格标量 : %d 核物理 CPU / %d GB 物理内存\n", p.CPUCores, p.MemoryGB)
+		fmt.Printf("  • 终端Shell视图: 窗口尺寸: %dx%d (列x行), 登录Shell: %s\n", p.TerminalCols, p.TerminalRows, p.DefaultShell)
+		fmt.Printf("  • 开发者工作区 : %s 正在编写 %s (Git分支: %s)\n", p.Username, p.WorkspacePath, p.GitBranch)
+		fmt.Printf("  • 本地地理时区 : %s, %s (时区: %s, 语言: %s)\n", p.City, p.State, p.Timezone, p.AcceptLanguage)
 		fmt.Printf("  • W3C遥测追踪  : Traceparent: %s\n", p.Traceparent)
 		fmt.Printf("  • W3C行李标头  : Baggage: %s\n", p.Baggage)
 	}

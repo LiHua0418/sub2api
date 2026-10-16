@@ -273,53 +273,21 @@ type codexFingerprintIDs struct {
 	originalBodySessionID         string
 	originalBodySessionIDCaptured bool
 	userAgent                     string
-	secPlatform                   string
 	acceptLanguage                string
 	clientTimezone                string
-	chromeMajor                   string
 	osName                        string
 	osVersion                     string
 	arch                          string
 	cpuCores                      int
 	memoryGB                      int
-	screenWidth                   int
-	screenHeight                  int
-	availHeight                   int
-	dpr                           float64
 	terminalCols                  int
 	terminalRows                  int
 	username                      string
 	homeDir                       string
 	workspacePath                 string
 	gitBranch                     string
-	ideHost                       string
-	installedApps                 []string
-	systemFonts                   []string
-	cpuModel                      string
-	cpuFrequency                  string
-	memoryType                    string
-	memoryModel                   string
-	ssdModel                      string
-	ssdInterface                  string
-	storageQuota                  int64
-	storageUsage                  int64
-	jsHeapLimit                   int64
-	audioDevice                   string
-	micDevice                     string
 	traceparent                   string
 	baggage                       string
-	batteryLevel                  float64
-	gitCommitSHA                  string
-	gitDirtyFilesCount            int
-	gitRemoteOrigin               string
-	parentProcess                 string
-	refreshRate                   int
-	keyboardModel                 string
-	keyboardLayout                string
-	mouseModel                    string
-	pointerType                   string
-	hasTrackpad                   bool
-	hasTrackpoint                 bool
 }
 
 // resolveCodexFingerprintIDs 按收敛模式计算出站 ID 集合。
@@ -342,57 +310,24 @@ func resolveCodexFingerprintIDs(account *Account, clientSessionID string, mode c
 		turnStartedAtUnixMs: time.Now().UnixMilli(),
 	}
 
-	// 采用工业级硬件与环境基因库派生真实美国个人电脑画像 (全自洽物理细节)
+	// 采用工业级硬件与环境基因库派生真实美国个人电脑画像 (纯原生终端契约)
 	hwProfile := ResolveHardwareProfile(account.ID, seed)
-	ids.secPlatform = hwProfile.SecPlatform
 	ids.userAgent = fmt.Sprintf("codex_cli_rs/0.162.1 (%s) xterm-256color", hwProfile.PlatformUA)
 	ids.clientTimezone = hwProfile.Timezone
 	ids.acceptLanguage = hwProfile.AcceptLanguage
-	ids.chromeMajor = hwProfile.ChromeMajor
 	ids.osName = hwProfile.OSName
 	ids.osVersion = hwProfile.OSVersion
 	ids.arch = hwProfile.Arch
 	ids.cpuCores = hwProfile.CPUCores
 	ids.memoryGB = hwProfile.MemoryGB
-	ids.screenWidth = hwProfile.ScreenWidth
-	ids.screenHeight = hwProfile.ScreenHeight
-	ids.availHeight = hwProfile.AvailHeight
-	ids.dpr = hwProfile.DPR
 	ids.terminalCols = hwProfile.TerminalCols
 	ids.terminalRows = hwProfile.TerminalRows
 	ids.username = hwProfile.Username
 	ids.homeDir = hwProfile.HomeDir
 	ids.workspacePath = hwProfile.WorkspacePath
 	ids.gitBranch = hwProfile.GitBranch
-	ids.ideHost = hwProfile.IDEHost
-	ids.installedApps = hwProfile.InstalledApps
-	ids.systemFonts = hwProfile.SystemFonts
-
-	ids.cpuModel = hwProfile.CPUModel
-	ids.cpuFrequency = hwProfile.CPUFrequency
-	ids.memoryType = hwProfile.MemoryType
-	ids.memoryModel = hwProfile.MemoryModel
-	ids.ssdModel = hwProfile.SSDModel
-	ids.ssdInterface = hwProfile.SSDInterface
-	ids.storageQuota = hwProfile.StorageQuota
-	ids.storageUsage = hwProfile.StorageUsage
-	ids.jsHeapLimit = hwProfile.JSHeapLimit
-	ids.audioDevice = hwProfile.AudioDevice
-	ids.micDevice = hwProfile.MicDevice
 	ids.traceparent = hwProfile.Traceparent
 	ids.baggage = hwProfile.Baggage
-	ids.batteryLevel = hwProfile.BatteryLevel
-	ids.gitCommitSHA = hwProfile.GitCommitSHA
-	ids.gitDirtyFilesCount = hwProfile.GitDirtyFilesCount
-	ids.gitRemoteOrigin = hwProfile.GitRemoteOrigin
-	ids.parentProcess = hwProfile.ParentProcess
-	ids.refreshRate = hwProfile.RefreshRate
-	ids.keyboardModel = hwProfile.KeyboardModel
-	ids.keyboardLayout = hwProfile.KeyboardLayout
-	ids.mouseModel = hwProfile.MouseModel
-	ids.pointerType = hwProfile.PointerType
-	ids.hasTrackpad = hwProfile.HasTrackpad
-	ids.hasTrackpoint = hwProfile.HasTrackpoint
 
 	ids.installationID = resolveConvergedInstallationID(account, seed)
 	if ids.installationID == "" {
@@ -477,17 +412,12 @@ func applyCodexFingerprintHeaders(h http.Header, ids *codexFingerprintIDs) {
 	h.Set("session_id", ids.sessionID)
 	h.Set("thread-id", ids.threadID)
 
-	// 注入前三项真实个人电脑环境指纹 (平台UA、系统语言、本地时区、Client Hints)
+	// 注入真实终端环境指纹 (纯原生终端规范：UA、系统语言、本地时区、W3C APM 遥测，绝对不带 sec-ch-ua 浏览器头)
 	if ids.userAgent != "" {
 		h.Set("User-Agent", ids.userAgent)
 	}
 	if ids.acceptLanguage != "" {
 		h.Set("Accept-Language", ids.acceptLanguage)
-	}
-	if ids.secPlatform != "" {
-		h.Set("sec-ch-ua-platform", `"`+ids.secPlatform+`"`)
-		h.Set("sec-ch-ua-mobile", "?0")
-		h.Set("sec-ch-ua", fmt.Sprintf(`"Chromium";v="%s", "Not;A=Brand";v="24", "Google Chrome";v="%s"`, ids.chromeMajor, ids.chromeMajor))
 	}
 	if ids.clientTimezone != "" {
 		h.Set("x-codex-client-timezone", ids.clientTimezone)
@@ -583,50 +513,17 @@ func applyCodexFingerprintToClientMetadataMap(existing map[string]any, ids *code
 	existing["turn_id"] = ids.turnID
 	existing["x-codex-window-id"] = ids.windowID
 
-	// 注入真实物理硬件环境元数据 (与 HTTP Headers 100% 呼应自洽)
+	// 注入真实终端原生环境元数据 (100% 贴合官方 codex_cli_rs 运行时协议，杜绝任何非标/沙箱穿透伪造)
 	if ids.osName != "" {
 		existing["os"] = ids.osName
 		existing["os_version"] = ids.osVersion
 		existing["arch"] = ids.arch
 		existing["cpu_cores"] = ids.cpuCores
 		existing["memory_gb"] = ids.memoryGB
-		existing["screen_width"] = ids.screenWidth
-		existing["screen_height"] = ids.screenHeight
-		existing["avail_height"] = ids.availHeight
-		existing["device_pixel_ratio"] = ids.dpr
-		existing["timezone"] = ids.clientTimezone
 		existing["terminal_cols"] = ids.terminalCols
 		existing["terminal_rows"] = ids.terminalRows
-		existing["username"] = ids.username
-		existing["home_dir"] = ids.homeDir
 		existing["workspace_path"] = ids.workspacePath
 		existing["git_branch"] = ids.gitBranch
-		existing["ide_host"] = ids.ideHost
-		existing["installed_apps"] = ids.installedApps
-		existing["system_fonts"] = ids.systemFonts
-		existing["cpu_model"] = ids.cpuModel
-		existing["cpu_freq"] = ids.cpuFrequency
-		existing["memory_type"] = ids.memoryType
-		existing["memory_model"] = ids.memoryModel
-		existing["ssd_model"] = ids.ssdModel
-		existing["ssd_interface"] = ids.ssdInterface
-		existing["storage_quota_bytes"] = ids.storageQuota
-		existing["storage_usage_bytes"] = ids.storageUsage
-		existing["js_heap_limit"] = ids.jsHeapLimit
-		existing["audio_device"] = ids.audioDevice
-		existing["mic_device"] = ids.micDevice
-		existing["battery_level"] = ids.batteryLevel
-		existing["git_commit_sha"] = ids.gitCommitSHA
-		existing["git_dirty_files"] = ids.gitDirtyFilesCount
-		existing["git_remote_origin"] = ids.gitRemoteOrigin
-		existing["parent_process"] = ids.parentProcess
-		existing["refresh_rate"] = ids.refreshRate
-		existing["keyboard_model"] = ids.keyboardModel
-		existing["keyboard_layout"] = ids.keyboardLayout
-		existing["mouse_model"] = ids.mouseModel
-		existing["pointer_type"] = ids.pointerType
-		existing["has_trackpad"] = ids.hasTrackpad
-		existing["has_trackpoint"] = ids.hasTrackpoint
 	}
 
 	rewriteClientMetadataEmbeddedTurnMetadata(existing, map[string]any{
@@ -638,9 +535,6 @@ func applyCodexFingerprintToClientMetadataMap(existing map[string]any, ids *code
 		"turn_started_at_unix_ms": ids.turnStartedAtUnixMs,
 		"workspace_path":          ids.workspacePath,
 		"git_branch":              ids.gitBranch,
-		"git_commit_sha":          ids.gitCommitSHA,
-		"cpu_model":               ids.cpuModel,
-		"ssd_model":               ids.ssdModel,
 	})
 	return true
 }
