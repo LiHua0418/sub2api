@@ -152,7 +152,7 @@ func (s *OpenAIGatewayService) doOpenAIProxyAttempt(req *http.Request, account *
 			return markOpenAIResponseEgress(resp, req, target.proxyID), err
 		}
 	}
-	resp, err = s.httpUpstream.Do(req, target.url, account.ID, account.Concurrency)
+	resp, err = s.httpUpstream.DoWithTLS(req, target.url, account.ID, account.Concurrency, s.tlsFPProfileService.ResolveTLSProfile(account))
 	return markOpenAIResponseEgress(resp, req, target.proxyID), err
 }
 

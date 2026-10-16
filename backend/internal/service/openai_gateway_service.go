@@ -506,6 +506,7 @@ type OpenAIGatewayService struct {
 	channelService         *ChannelService
 	balanceNotifyService   *BalanceNotifyService
 	settingService         *SettingService
+	tlsFPProfileService    *TLSFingerprintProfileService
 	userPlatformQuotaRepo  UserPlatformQuotaRepository
 	liveAttestation        liveattestation.Provider
 	liveAttestationCipher  SecretEncryptor
@@ -571,6 +572,11 @@ type OpenAIGatewayOption func(*OpenAIGatewayService)
 // WithOpenAIRPMCache enables strict RPM accounting for OpenAI OAuth accounts.
 func WithOpenAIRPMCache(cache RPMCache) OpenAIGatewayOption {
 	return func(s *OpenAIGatewayService) { s.rpmCache = cache }
+}
+
+// WithOpenAITLSProfileService sets the TLSFingerprintProfileService for OpenAI Gateway
+func WithOpenAITLSProfileService(svc *TLSFingerprintProfileService) OpenAIGatewayOption {
+	return func(s *OpenAIGatewayService) { s.tlsFPProfileService = svc }
 }
 
 // NewOpenAIGatewayService creates a new OpenAIGatewayService

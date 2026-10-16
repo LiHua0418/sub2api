@@ -2683,10 +2683,14 @@ func (a *Account) IsAnthropicOAuthOrSetupToken() bool {
 }
 
 // IsTLSFingerprintEnabled 检查是否启用 TLS 指纹伪装
-// 仅适用于 Anthropic OAuth/SetupToken 类型账号
-// 启用后将模拟 Claude Code (Node.js) 客户端的 TLS 握手特征
+// 适用于 Anthropic 与 OpenAI OAuth 账号 (使用 utls 消除 Go 标准库 TLS 指纹)
 func (a *Account) IsTLSFingerprintEnabled() bool {
-	// 仅支持 Anthropic OAuth/SetupToken 账号
+	if a == nil {
+		return false
+	}
+	if a.IsOpenAIOAuth() {
+		return true // OpenAI OAuth 账号默认启用传输层 TLS/H2 拟真握手，杜绝 Go 指纹泄露
+	}
 	if !a.IsAnthropicOAuthOrSetupToken() {
 		return false
 	}
