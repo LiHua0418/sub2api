@@ -1050,7 +1050,7 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 	}
 
 	var releaseProxy func()
-	if isOAuth && !pelicanTestRequested(c) && openAIAccountProxyURL(credentialAccount) != "" && s.openaiGatewayService != nil {
+	if isOAuth && openAIAccountProxyURL(credentialAccount) != "" && s.openaiGatewayService != nil {
 		if pinnedProxy, release, err := s.openaiGatewayService.pinCodexTicketEgress(req, credentialAccount, proxyURL); err == nil && pinnedProxy != "" {
 			proxyURL = pinnedProxy
 			releaseProxy = release

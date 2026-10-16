@@ -158,7 +158,11 @@ func (s *OpenAIGatewayService) checkTicketCandyProblem(ctx context.Context, acco
 
 	req.Header.Set(openAICodexTurnStateHeader, ticket.State)
 	req.Header.Set("Cookie", strings.Join(ticket.HarvestCookies, "; "))
-	req.Header.Set("session_id", uuid.NewString())
+	if sid := harvestTicketSessionID(ticket); sid != "" {
+		req.Header.Set("session_id", sid)
+	} else {
+		req.Header.Set("session_id", uuid.NewString())
+	}
 	resp, err := s.httpUpstream.Do(req, proxy, account.ID, account.Concurrency)
 	if err != nil || resp == nil {
 		logger.L().Warn("codex_ticket_qualifier checkTicketCandyProblem request error", zap.Error(err), zap.String("gateway", ticket.Gateway))
@@ -279,7 +283,11 @@ func (s *OpenAIGatewayService) checkTicketPelicanAnimation(ctx context.Context, 
 
 	req.Header.Set(openAICodexTurnStateHeader, ticket.State)
 	req.Header.Set("Cookie", strings.Join(ticket.HarvestCookies, "; "))
-	req.Header.Set("session_id", uuid.NewString())
+	if sid := harvestTicketSessionID(ticket); sid != "" {
+		req.Header.Set("session_id", sid)
+	} else {
+		req.Header.Set("session_id", uuid.NewString())
+	}
 	resp, err := s.httpUpstream.Do(req, proxy, account.ID, account.Concurrency)
 	if err != nil || resp == nil {
 		return false
