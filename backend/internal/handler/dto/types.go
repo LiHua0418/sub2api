@@ -242,6 +242,7 @@ type Account struct {
 	CreatedAt               time.Time                         `json:"created_at"`
 	UpdatedAt               time.Time                         `json:"updated_at"`
 	OpenCodeGoUsage         *service.OpenCodeGoUsageState     `json:"opencode_go_usage,omitempty"`
+	FingerprintSummary      *AccountFingerprintSummary        `json:"fingerprint_summary,omitempty"`
 
 	Schedulable bool `json:"schedulable"`
 
@@ -354,6 +355,7 @@ type AccountListItem struct {
 	OllamaCloudUsage  *service.OllamaCloudUsageState    `json:"ollama_cloud_usage,omitempty"`
 	CodexTurnTickets  []service.OpenAICodexTicketStatus `json:"codex_turn_tickets,omitempty"`
 	OpenCodeGoUsage   *service.OpenCodeGoUsageState     `json:"opencode_go_usage,omitempty"`
+	FingerprintSummary *AccountFingerprintSummary       `json:"fingerprint_summary,omitempty"`
 
 	ProxyID                 *int64     `json:"proxy_id"`
 	ProxyFallbackOriginID   *int64     `json:"proxy_fallback_origin_id"`
@@ -545,6 +547,66 @@ type AdminRedeemCode struct {
 	RedeemCode
 
 	Notes string `json:"notes"`
+}
+
+// AccountFingerprintSummary 列表页极轻量摘要
+type AccountFingerprintSummary struct {
+	DeviceModel string `json:"device_model"`
+	OSName      string `json:"os_name"`
+}
+
+// AccountFingerprintResponse 详情模态框完整终端指纹画像
+type AccountFingerprintResponse struct {
+	AccountID   int64 `json:"account_id"`
+	Hardware    AccountFingerprintHardware    `json:"hardware"`
+	Terminal    AccountFingerprintTerminal    `json:"terminal"`
+	Workspace   AccountFingerprintWorkspace   `json:"workspace"`
+	Geo         AccountFingerprintGeo         `json:"geo"`
+	Identifiers AccountFingerprintIdentifiers `json:"identifiers"`
+	Telemetry   AccountFingerprintTelemetry   `json:"telemetry"`
+}
+
+type AccountFingerprintHardware struct {
+	DeviceModel string `json:"device_model"`
+	OSName      string `json:"os_name"`
+	OSVersion   string `json:"os_version"`
+	Arch        string `json:"arch"`
+	CPUCores    int    `json:"cpu_cores"`
+	MemoryGB    int    `json:"memory_gb"`
+}
+
+type AccountFingerprintTerminal struct {
+	Cols         int    `json:"cols"`
+	Rows         int    `json:"rows"`
+	DefaultShell string `json:"default_shell"`
+	PlatformUA   string `json:"platform_ua"`
+	UserAgent    string `json:"user_agent"`
+}
+
+type AccountFingerprintWorkspace struct {
+	Username      string `json:"username"`
+	HomeDir       string `json:"home_dir"`
+	WorkspacePath string `json:"workspace_path"`
+	GitBranch     string `json:"git_branch"`
+}
+
+type AccountFingerprintGeo struct {
+	City           string `json:"city"`
+	State          string `json:"state"`
+	Timezone       string `json:"timezone"`
+	AcceptLanguage string `json:"accept_language"`
+}
+
+type AccountFingerprintIdentifiers struct {
+	InstallationID  string `json:"installation_id"`
+	SessionID       string `json:"session_id"`
+	WindowID        string `json:"window_id"`
+	FingerprintSeed string `json:"seed_masked"`
+}
+
+type AccountFingerprintTelemetry struct {
+	Traceparent string `json:"traceparent"`
+	Baggage     string `json:"baggage"`
 }
 
 type NullableTimeField struct {

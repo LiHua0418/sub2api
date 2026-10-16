@@ -315,6 +315,55 @@ export async function testAccount(id: number): Promise<{
   return data
 }
 
+export interface AccountFingerprintResponse {
+  account_id: number
+  hardware: {
+    device_model: string
+    os_name: string
+    os_version: string
+    arch: string
+    cpu_cores: number
+    memory_gb: number
+  }
+  terminal: {
+    cols: number
+    rows: number
+    default_shell: string
+    platform_ua: string
+    user_agent: string
+  }
+  workspace: {
+    username: string
+    home_dir: string
+    workspace_path: string
+    git_branch: string
+  }
+  geo: {
+    city: string
+    state: string
+    timezone: string
+    accept_language: string
+  }
+  identifiers: {
+    installation_id: string
+    session_id: string
+    window_id: string
+    seed_masked: string
+  }
+  telemetry: {
+    traceparent: string
+    baggage: string
+  }
+}
+
+/**
+ * Get account terminal fingerprint details
+ */
+export async function getFingerprint(id: number): Promise<AccountFingerprintResponse> {
+  const { data } = await apiClient.get<AccountFingerprintResponse>(`/admin/accounts/${id}/fingerprint`)
+  return data
+}
+
 /**
  * Refresh account credentials
  * @param id - Account ID

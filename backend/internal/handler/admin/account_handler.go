@@ -394,6 +394,15 @@ func (h *AccountHandler) enrichCodexTicketStatus(account *service.Account, out *
 		}
 		out.CodexTurnTickets = service.OpenAICodexTicketStatuses(account, cfg, time.Now())
 	}
+	// 丰富列表轻量终端指纹摘要
+	if account != nil && out != nil {
+		if model, osName, ok := service.ResolveAccountFingerprintSummary(account); ok {
+			out.FingerprintSummary = &dto.AccountFingerprintSummary{
+				DeviceModel: model,
+				OSName:      osName,
+			}
+		}
+	}
 }
 
 func (h *AccountHandler) isSimpleMode() bool {
@@ -1024,6 +1033,71 @@ func (h *AccountHandler) GetByID(c *gin.Context) {
 	}
 
 	response.Success(c, h.buildAccountResponseWithRuntime(c.Request.Context(), account))
+}
+
+// GetFingerprint 获取账号的完整终端指纹画像详情 (供可视化弹窗展示)
+// GET /api/v1/admin/accounts/:id/fingerprint
+func (h *AccountHandler) GetFingerprint(c *gin.Context) {
+	accountID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "Invalid account ID")
+		return
+	}
+
+	account, err := h.adminService.GetAccount(c.Request.Context(), accountID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	details := service.ResolveAccountFingerprintDetails(account)
+	if details == nil {
+		response.Error(c, http.StatusNotFound, "Fingerprint not initialized or unsupported")
+		return
+	}
+
+	resp := &dto.AccountFingerprintResponse{
+		AccountID: account.ID,
+		Hardware: dto.AccountFingerprintHardware{
+			DeviceModel: details.DeviceModel,
+			OSName:      details.OSName,
+			OSVersion:   details.OSVersion,
+			Arch:        details.Arch,
+			CPUCores:    details.CPUCores,
+			MemoryGB:    details.MemoryGB,
+		},
+		Terminal: dto.AccountFingerprintTerminal{
+			Cols:         details.Cols,
+			Rows:         details.Rows,
+			DefaultShell: details.DefaultShell,
+			PlatformUA:   details.PlatformUA,
+			UserAgent:    details.UserAgent,
+		},
+		Workspace: dto.AccountFingerprintWorkspace{
+			Username:      details.Username,
+			HomeDir:       details.HomeDir,
+			WorkspacePath: details.WorkspacePath,
+			GitBranch:     details.GitBranch,
+		},
+		Geo: dto.AccountFingerprintGeo{
+			City:           details.City,
+			State:          details.State,
+			Timezone:       details.Timezone,
+			AcceptLanguage: details.AcceptLanguage,
+		},
+		Identifiers: dto.AccountFingerprintIdentifiers{
+			InstallationID:  details.InstallationID,
+			SessionID:       details.SessionID,
+			WindowID:        details.WindowID,
+			FingerprintSeed: details.SeedMasked,
+		},
+		Telemetry: dto.AccountFingerprintTelemetry{
+			Traceparent: details.Traceparent,
+			Baggage:     details.Baggage,
+		},
+	}
+
+	response.Success(c, resp)
 }
 
 // CheckMixedChannel handles checking mixed channel risk for account-group binding.

@@ -436,6 +436,28 @@
               </div>
             </div>
           </template>
+          <template #cell-fingerprint="{ row }">
+            <div v-if="row.fingerprint_summary" class="flex items-center">
+              <button
+                @click="handleShowFingerprint(row)"
+                class="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs font-medium text-gray-700 transition hover:border-primary-300 hover:bg-primary-50 hover:text-primary-600 dark:border-dark-600 dark:bg-dark-700/60 dark:text-gray-200 dark:hover:border-primary-500 dark:hover:bg-primary-950/30 dark:hover:text-primary-400"
+                :title="'点击查看完整设备指纹画像: ' + row.fingerprint_summary.device_model"
+              >
+                <!-- OS Icon -->
+                <span v-if="row.fingerprint_summary.os_name === 'macOS'" class="text-[13px]"></span>
+                <span v-else class="text-[11px] text-blue-500">⊞</span>
+                <span class="max-w-[8.5rem] truncate font-medium">{{ row.fingerprint_summary.device_model }}</span>
+              </button>
+            </div>
+            <button
+              v-else-if="row.platform === 'openai'"
+              @click="handleShowFingerprint(row)"
+              class="inline-flex items-center gap-1 text-xs text-primary-600 hover:underline dark:text-primary-400"
+            >
+              <span>查看指纹</span>
+            </button>
+            <span v-else class="text-sm text-gray-400 dark:text-dark-500">-</span>
+          </template>
           <template #cell-actions="{ row }">
             <div class="flex items-center gap-1">
               <button @click="handleEdit(row)" class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-dark-700 dark:hover:text-primary-400">
@@ -490,6 +512,7 @@
     </ConfirmDialog>
     <ErrorPassthroughRulesModal v-if="authStore.isAdmin" :show="showErrorPassthrough" @close="showErrorPassthrough = false" />
     <TLSFingerprintProfilesModal v-if="authStore.isAdmin" :show="showTLSFingerprintProfiles" @close="showTLSFingerprintProfiles = false" />
+    <FingerprintModal :show="showFingerprintModal" :account="fingerprintAcc" @close="showFingerprintModal = false" />
     <TotpStepUpDialog :controller="accountExportStepUp" />
   </AppLayout>
 </template>
@@ -513,7 +536,7 @@ import DataTable from '@/components/common/DataTable.vue'
 import HelpTooltip from '@/components/common/HelpTooltip.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
-import { CreateAccountModal, EditAccountModal, BulkEditAccountModal, SyncFromCrsModal, TempUnschedStatusModal } from '@/components/account'
+import { CreateAccountModal, EditAccountModal, BulkEditAccountModal, SyncFromCrsModal, TempUnschedStatusModal, FingerprintModal } from '@/components/account'
 import AccountTableActions from '@/components/admin/account/AccountTableActions.vue'
 import AccountTableFilters from '@/components/admin/account/AccountTableFilters.vue'
 import AccountBulkActionsBar from '@/components/admin/account/AccountBulkActionsBar.vue'
@@ -574,6 +597,13 @@ const accountGroupsForRow = (account: Pick<AccountListItem, 'group_ids'>): Admin
   if (groupIDs.length === 0) return []
   return groupIDs.map(id => groupsByID.value.get(id)).filter((group): group is AdminGroup => Boolean(group))
 }
+const showFingerprintModal = ref(false)
+const fingerprintAcc = ref<any>(null)
+const handleShowFingerprint = (row: any) => {
+  fingerprintAcc.value = row
+  showFingerprintModal.value = true
+}
+
 const accountTableRef = ref<HTMLElement | null>(null)
 const dataTableRef = ref<InstanceType<typeof DataTable> | null>(null)
 type AccountBulkEditTarget =
@@ -1856,6 +1886,7 @@ const allColumns = computed(() => {
     { key: 'last_used_at', label: t('admin.accounts.columns.lastUsed'), sortable: true },
     { key: 'created_at', label: t('admin.accounts.columns.createdAt'), sortable: true },
     { key: 'expires_at', label: t('admin.accounts.columns.expiresAt'), sortable: true },
+    { key: 'fingerprint', label: t('admin.accounts.columns.fingerprint'), sortable: false },
     { key: 'notes', label: t('admin.accounts.columns.notes'), sortable: false },
     { key: 'actions', label: t('admin.accounts.columns.actions'), sortable: false }
   )

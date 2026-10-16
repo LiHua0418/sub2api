@@ -276,6 +276,7 @@ export default {
         lastUsed: 'Last Used',
         createdAt: 'Created',
         expiresAt: 'Expires At',
+        fingerprint: 'Device Fingerprint',
         actions: 'Actions'
       },
       schedulerScore: {

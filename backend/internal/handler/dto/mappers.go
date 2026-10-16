@@ -510,6 +510,7 @@ func AccountListItemFromAccount(a *Account) *AccountListItem {
 		QuotaDimension: a.QuotaDimension, ParentEmail: a.ParentEmail, ParentPlanType: a.ParentPlanType,
 		ParentPrivacyMode: a.ParentPrivacyMode, ParentSubscriptionExpiresAt: a.ParentSubscriptionExpiresAt,
 		ParentChatGPTAccountID: a.ParentChatGPTAccountID, Proxy: a.Proxy, GroupIDs: a.GroupIDs,
+		FingerprintSummary: a.FingerprintSummary,
 	}
 }
 

@@ -410,6 +410,7 @@ func registerAccountRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAu
 		accounts.GET("/opencode-go-usage/settings", h.Admin.Account.GetOpenCodeGoUsageSettings)
 		accounts.PUT("/opencode-go-usage/settings", h.Admin.Account.UpdateOpenCodeGoUsageSettings)
 		accounts.GET("/:id", h.Admin.Account.GetByID)
+		accounts.GET("/:id/fingerprint", h.Admin.Account.GetFingerprint)
 		if h.Admin.OpenAIOAuthReauth != nil {
 			accounts.GET("/:id/openai-reauth", h.Admin.OpenAIOAuthReauth.GetStatus)
 			accounts.GET("/:id/totp-rotation", h.Admin.OpenAIOAuthReauth.RotationStatus)

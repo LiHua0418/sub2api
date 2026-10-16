@@ -669,3 +669,99 @@ func rewriteClientMetadataEmbeddedTurnMetadata(clientMetadata map[string]any, fi
 		clientMetadata["x-codex-turn-metadata"] = string(rebuilt)
 	}
 }
+
+// AccountFingerprintDetails 完整获取指定账号的终端指纹画像（供管理端可视化面板展示）
+type AccountFingerprintDetails struct {
+	DeviceModel    string
+	OSName         string
+	OSVersion      string
+	Arch           string
+	CPUCores       int
+	MemoryGB       int
+	Cols           int
+	Rows           int
+	DefaultShell   string
+	PlatformUA     string
+	UserAgent      string
+	Username       string
+	HomeDir        string
+	WorkspacePath  string
+	GitBranch      string
+	City           string
+	State          string
+	Timezone       string
+	AcceptLanguage string
+	InstallationID string
+	SessionID      string
+	WindowID       string
+	SeedMasked     string
+	Traceparent    string
+	Baggage        string
+}
+
+// ResolveAccountFingerprintDetails 解析指定账号的完整终端指纹细节
+func ResolveAccountFingerprintDetails(account *Account) *AccountFingerprintDetails {
+	if account == nil {
+		return nil
+	}
+	seed, ok := codexFingerprintSeed(account.Extra)
+	if !ok || seed == "" {
+		return nil
+	}
+
+	hw := ResolveHardwareProfile(account.ID, seed)
+	installID := resolveConvergedInstallationID(account, seed)
+	sessionID := resolveConvergedSessionID(seed)
+	threadID := resolveConvergedThreadID(seed, "")
+	if threadID == "" {
+		threadID = sessionID
+	}
+	windowID := threadID + ":0"
+
+	seedMasked := seed
+	if len(seed) > 8 {
+		seedMasked = seed[:4] + "****" + seed[len(seed)-4:]
+	}
+
+	return &AccountFingerprintDetails{
+		DeviceModel:    hw.DeviceModel,
+		OSName:         hw.OSName,
+		OSVersion:      hw.OSVersion,
+		Arch:           hw.Arch,
+		CPUCores:       hw.CPUCores,
+		MemoryGB:       hw.MemoryGB,
+		Cols:           hw.TerminalCols,
+		Rows:           hw.TerminalRows,
+		DefaultShell:   hw.DefaultShell,
+		PlatformUA:     hw.PlatformUA,
+		UserAgent:      fmt.Sprintf("codex_cli_rs/0.162.1 (%s) xterm-256color", hw.PlatformUA),
+		Username:       hw.Username,
+		HomeDir:        hw.HomeDir,
+		WorkspacePath:  hw.WorkspacePath,
+		GitBranch:      hw.GitBranch,
+		City:           hw.City,
+		State:          hw.State,
+		Timezone:       hw.Timezone,
+		AcceptLanguage: hw.AcceptLanguage,
+		InstallationID: installID,
+		SessionID:      sessionID,
+		WindowID:       windowID,
+		SeedMasked:     seedMasked,
+		Traceparent:    hw.Traceparent,
+		Baggage:        fmt.Sprintf("sentry-environment=production,sentry-release=codex-cli@0.162.1,sentry-user_id=%s", hw.Username),
+	}
+}
+
+// ResolveAccountFingerprintSummary 解析极轻量的设备摘要 (仅供列表快速渲染)
+func ResolveAccountFingerprintSummary(account *Account) (deviceModel, osName string, ok bool) {
+	if account == nil {
+		return "", "", false
+	}
+	seed, valid := codexFingerprintSeed(account.Extra)
+	if !valid || seed == "" {
+		return "", "", false
+	}
+	hw := ResolveHardwareProfile(account.ID, seed)
+	return hw.DeviceModel, hw.OSName, true
+}
+

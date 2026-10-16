@@ -123,6 +123,7 @@ export default {
         lastUsed: '最近使用',
         createdAt: '创建时间',
         expiresAt: '过期时间',
+        fingerprint: '终端指纹',
         actions: '操作'
       },
       schedulerScore: {
