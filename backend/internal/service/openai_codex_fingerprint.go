@@ -112,14 +112,14 @@ func stripCodexFingerprintSeed(extra map[string]any) map[string]any {
 
 func codexFingerprintModeFromExtra(extra map[string]any) codexFingerprintMode {
 	if extra == nil {
-		return codexFingerprintOff
+		return codexFingerprintSession // 默认开启 session 级拟真指纹收敛
 	}
 	raw, _ := extra[codexFingerprintModeExtraKey].(string)
 	switch codexFingerprintMode(strings.TrimSpace(raw)) {
 	case codexFingerprintOff, codexFingerprintDevice, codexFingerprintSession, codexFingerprintFull:
 		return codexFingerprintMode(strings.TrimSpace(raw))
 	default:
-		return codexFingerprintOff
+		return codexFingerprintSession // 未显式关闭时，默认自动收敛并生成前三项环境指纹
 	}
 }
 
@@ -272,6 +272,11 @@ type codexFingerprintIDs struct {
 	turnStartedAtUnixMs           int64
 	originalBodySessionID         string
 	originalBodySessionIDCaptured bool
+	userAgent                     string
+	secPlatform                   string
+	acceptLanguage                string
+	clientTimezone                string
+	chromeMajor                   string
 }
 
 // resolveCodexFingerprintIDs 按收敛模式计算出站 ID 集合。
@@ -293,6 +298,26 @@ func resolveCodexFingerprintIDs(account *Account, clientSessionID string, mode c
 		mode:                mode,
 		turnStartedAtUnixMs: time.Now().UnixMilli(),
 	}
+
+	// 派生前三项真实美国个人电脑环境指纹 (硬件/系统平台、本地时区、系统语言链)
+	h := sha256.Sum256([]byte(fmt.Sprintf("%d:%s:desktop_v1", account.ID, seed)))
+	seedNum := binary.BigEndian.Uint64(h[:8])
+
+	isMac := (seedNum % 10) < 6 // 60% Mac, 40% Windows
+	if isMac {
+		ids.secPlatform = "macOS"
+		ids.userAgent = "codex_cli_rs/0.162.1 (Macintosh; Intel Mac OS X 10_15_7) xterm-256color"
+	} else {
+		ids.secPlatform = "Windows"
+		ids.userAgent = "codex_cli_rs/0.162.1 (Windows NT 10.0; Win64; x64) xterm-256color"
+	}
+
+	timezones := []string{"America/Los_Angeles", "America/New_York", "America/Chicago"}
+	ids.clientTimezone = timezones[(seedNum>>8)%uint64(len(timezones))]
+
+	languages := []string{"en-US,en;q=0.9", "en-US,en;q=0.9,es;q=0.8"}
+	ids.acceptLanguage = languages[(seedNum>>12)%uint64(len(languages))]
+	ids.chromeMajor = "128"
 
 	ids.installationID = resolveConvergedInstallationID(account, seed)
 	if ids.installationID == "" {
@@ -376,6 +401,22 @@ func applyCodexFingerprintHeaders(h http.Header, ids *codexFingerprintIDs) {
 	h.Set("session-id", ids.sessionID)
 	h.Set("session_id", ids.sessionID)
 	h.Set("thread-id", ids.threadID)
+
+	// 注入前三项真实个人电脑环境指纹 (平台UA、系统语言、本地时区、Client Hints)
+	if ids.userAgent != "" {
+		h.Set("User-Agent", ids.userAgent)
+	}
+	if ids.acceptLanguage != "" {
+		h.Set("Accept-Language", ids.acceptLanguage)
+	}
+	if ids.secPlatform != "" {
+		h.Set("sec-ch-ua-platform", `"`+ids.secPlatform+`"`)
+		h.Set("sec-ch-ua-mobile", "?0")
+		h.Set("sec-ch-ua", fmt.Sprintf(`"Chromium";v="%s", "Not;A=Brand";v="24", "Google Chrome";v="%s"`, ids.chromeMajor, ids.chromeMajor))
+	}
+	if ids.clientTimezone != "" {
+		h.Set("x-codex-client-timezone", ids.clientTimezone)
+	}
 
 	rewriteCodexTurnMetadataFields(h, map[string]any{
 		"installation_id":         ids.installationID,
