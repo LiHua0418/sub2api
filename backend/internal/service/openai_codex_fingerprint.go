@@ -288,6 +288,13 @@ type codexFingerprintIDs struct {
 	dpr                           float64
 	terminalCols                  int
 	terminalRows                  int
+	username                      string
+	homeDir                       string
+	workspacePath                 string
+	gitBranch                     string
+	ideHost                       string
+	installedApps                 []string
+	systemFonts                   []string
 }
 
 // resolveCodexFingerprintIDs 按收敛模式计算出站 ID 集合。
@@ -328,6 +335,13 @@ func resolveCodexFingerprintIDs(account *Account, clientSessionID string, mode c
 	ids.dpr = hwProfile.DPR
 	ids.terminalCols = hwProfile.TerminalCols
 	ids.terminalRows = hwProfile.TerminalRows
+	ids.username = hwProfile.Username
+	ids.homeDir = hwProfile.HomeDir
+	ids.workspacePath = hwProfile.WorkspacePath
+	ids.gitBranch = hwProfile.GitBranch
+	ids.ideHost = hwProfile.IDEHost
+	ids.installedApps = hwProfile.InstalledApps
+	ids.systemFonts = hwProfile.SystemFonts
 
 	ids.installationID = resolveConvergedInstallationID(account, seed)
 	if ids.installationID == "" {
@@ -526,6 +540,13 @@ func applyCodexFingerprintToClientMetadataMap(existing map[string]any, ids *code
 		existing["timezone"] = ids.clientTimezone
 		existing["terminal_cols"] = ids.terminalCols
 		existing["terminal_rows"] = ids.terminalRows
+		existing["username"] = ids.username
+		existing["home_dir"] = ids.homeDir
+		existing["workspace_path"] = ids.workspacePath
+		existing["git_branch"] = ids.gitBranch
+		existing["ide_host"] = ids.ideHost
+		existing["installed_apps"] = ids.installedApps
+		existing["system_fonts"] = ids.systemFonts
 	}
 
 	rewriteClientMetadataEmbeddedTurnMetadata(existing, map[string]any{
@@ -535,6 +556,8 @@ func applyCodexFingerprintToClientMetadataMap(existing map[string]any, ids *code
 		"turn_id":                 ids.turnID,
 		"window_id":               ids.windowID,
 		"turn_started_at_unix_ms": ids.turnStartedAtUnixMs,
+		"workspace_path":          ids.workspacePath,
+		"git_branch":              ids.gitBranch,
 	})
 	return true
 }

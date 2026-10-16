@@ -5,45 +5,55 @@ import (
 	"encoding/binary"
 	"fmt"
 	"net/http"
+	"strings"
 )
 
-// HardwareProfile 完整的真实个人电脑物理画像 (军工级全自洽)
+// HardwareProfile 完整的真实个人电脑物理画像 (全拟真军工级)
 type HardwareProfile struct {
-	DeviceModel    string  // 机型名称，如 MacBook Pro 14 (M2 Pro)
-	OSName         string  // macOS 或 Windows
-	OSVersion      string  // 具体系统内核或构建号
-	Arch           string  // arm64 或 x86_64
-	PlatformUA     string  // UA平台段
-	SecPlatform    string  // Client Hint: "macOS" 或 "Windows"
-	CPUCores       int     // 核心数
-	MemoryGB       int     // 物理内存 (GB)
-	JSHeapLimit    int64   // V8 引擎 JS Heap 内存上限 (字节)
-	JSHeapTotal    int64   // 当前已分配堆大小
-	JSHeapUsed     int64   // 实际存活对象大小
-	SSDSizeGB      int     // 固态硬盘物理容量 (512 / 1024 / 2048)
-	FileSystem     string  // 文件系统 (APFS / NTFS)
-	StorageQuota   int64   // 浏览器持久化配额 (字节)
-	StorageUsage   int64   // 当前已用缓存 (字节)
-	ScreenWidth    int     // 屏幕物理宽度
-	ScreenHeight   int     // 屏幕物理高度
-	AvailHeight    int     // 扣除任务栏/顶栏后的工作区高度
-	DPR            float64 // 设备像素比 (Device Pixel Ratio)
-	MaxTouchPoints int     // 触控点数 (Mac恒为0，Win部分触控为10)
-	WebGLVendor    string  // WebGL 厂商字符串
-	WebGLRenderer  string  // 完整的 WebGL 驱动渲染器字符串
-	AudioDevice    string  // 扬声器外设标签
-	MicDevice      string  // 麦克风外设标签
-	TerminalCols   int     // 终端列数
-	TerminalRows   int     // 终端行数
-	DefaultShell   string  // 默认登录 Shell (/bin/zsh 或 powershell.exe)
-	DownlinkMbps   int     // 网络接口估计带宽 (Mbps)
-	NetworkRTT     int     // 真实 RTT 时延 (ms)
-	City           string  // 美国城市
-	State          string  // 美国州名代码 (CA, NY, TX 等)
-	Timezone       string  // 真实本地时区 (America/Los_Angeles 等)
-	AcceptLanguage string  // 拟真的多语言回退链
-	ChromeMajor    string  // 主版本号，如 "128"
-	ChromeFull     string  // 完整浏览器构建号
+	DeviceModel    string   // 机型名称，如 MacBook Pro 14 (M2 Pro)
+	OSName         string   // macOS 或 Windows
+	OSVersion      string   // 具体系统内核或构建号
+	Arch           string   // arm64 或 x86_64
+	PlatformUA     string   // UA平台段
+	SecPlatform    string   // Client Hint: "macOS" 或 "Windows"
+	CPUCores       int      // 核心数
+	MemoryGB       int      // 物理内存 (GB)
+	JSHeapLimit    int64    // V8 引擎 JS Heap 内存上限 (字节)
+	JSHeapTotal    int64    // 当前已分配堆大小
+	JSHeapUsed     int64    // 实际存活对象大小
+	SSDSizeGB      int      // 固态硬盘物理容量 (512 / 1024 / 2048)
+	FileSystem     string   // 文件系统 (APFS / NTFS)
+	StorageQuota   int64    // 浏览器持久化配额 (字节)
+	StorageUsage   int64    // 当前已用缓存 (字节)
+	ScreenWidth    int      // 屏幕物理宽度
+	ScreenHeight   int      // 屏幕物理高度
+	AvailHeight    int      // 扣除任务栏/顶栏后的工作区高度
+	DPR            float64  // 设备像素比 (Device Pixel Ratio)
+	MaxTouchPoints int      // 触控点数 (Mac恒为0，Win部分触控为10)
+	WebGLVendor    string   // WebGL 厂商字符串
+	WebGLRenderer  string   // 完整的 WebGL 驱动渲染器字符串
+	AudioDevice    string   // 扬声器外设标签
+	MicDevice      string   // 麦克风外设标签
+	TerminalCols   int      // 终端列数
+	TerminalRows   int      // 终端行数
+	DefaultShell   string   // 默认登录 Shell (/bin/zsh 或 powershell.exe)
+	DownlinkMbps   int      // 网络接口估计带宽 (Mbps)
+	NetworkRTT     int      // 真实 RTT 时延 (ms)
+	City           string   // 美国城市
+	State          string   // 美国州名代码 (CA, NY, TX 等)
+	Timezone       string   // 真实本地时区 (America/Los_Angeles 等)
+	AcceptLanguage string   // 拟真的多语言回退链
+	ChromeMajor    string   // 主版本号，如 "128"
+	ChromeFull     string   // 完整浏览器构建号
+
+	// 软件生态与真实使用痕迹扩展 (Software Ecology & Workspace Context)
+	Username       string   // 本地用户名，如 "vlad", "anne", "alex"
+	HomeDir        string   // 主目录路径，如 "/Users/vlad"
+	InstalledApps  []string // 本地安装的高频应用列表
+	SystemFonts    []string // 真实安装字体列表 (含系统字体与开发者编程字体)
+	WorkspacePath  string   // 当前真实项目工作区路径
+	GitBranch      string   // 拟真的当前 Git 分支
+	IDEHost        string   // 真实使用的开发工具环境，如 "VSCode 1.96.2"
 }
 
 type macDeviceSpec struct {
@@ -185,6 +195,31 @@ var usGeoCatalog = []usGeoSpec{
 	{city: "Miami", state: "FL", timezone: "America/New_York", lang: "en-US,en;q=0.8,es;q=0.9"},
 }
 
+var firstNames = []string{
+	"alex", "david", "vlad", "anne", "sarah", "michael", "emily", "jason",
+	"daniel", "brian", "chris", "ryan", "kevin", "eric", "lisa", "jessica",
+}
+
+var developerProjectNames = []string{
+	"ai-agent-service", "cloud-infra-core", "fintech-gateway", "data-pipeline-v2",
+	"auth-service", "mobile-api-backend", "developer-portal", "mesh-router",
+}
+
+var macInstalledAppPool = [][]string{
+	{"Visual Studio Code", "Docker Desktop", "iTerm2", "Slack", "Discord", "Notion", "Spotify", "1Password", "Postman"},
+	{"Visual Studio Code", "Warp", "Slack", "Figma", "Notion", "Arc Browser", "Raycast", "Bitwarden"},
+	{"Visual Studio Code", "JetBrains Rider", "Docker Desktop", "Zoom", "Slack", "Spotify", "TablePlus"},
+}
+
+var winInstalledAppPool = [][]string{
+	{"Visual Studio Code", "Visual Studio 2022", "Windows Terminal", "Slack", "Discord", "Docker Desktop", "GitKraken", "PowerToys"},
+	{"Visual Studio Code", "Windows Terminal", "Slack", "Notion", "Zoom", "Postman", "Spotify", "1Password"},
+	{"Visual Studio Code", "IntelliJ IDEA", "Windows Terminal", "Teams", "Discord", "DBeaver", "Bitwarden"},
+}
+
+var macFontPool = []string{"-apple-system", "BlinkMacSystemFont", "SF Pro Display", "Helvetica Neue", "Menlo", "Monaco", "JetBrains Mono", "Fira Code"}
+var winFontPool = []string{"Segoe UI", "Segoe UI Variable Text", "Consolas", "Cascadia Code", "Fira Code", "Arial", "Calibri"}
+
 var chromeVersions = [][2]string{
 	{"128", "128.0.6613.138"},
 	{"128", "128.0.6613.120"},
@@ -194,7 +229,7 @@ var chromeVersions = [][2]string{
 
 // ResolveHardwareProfile 基于账号唯一特征进行确定性散列派生出高度拟真的真实电脑
 func ResolveHardwareProfile(accountID int64, seed string) HardwareProfile {
-	h := sha256.Sum256([]byte(fmt.Sprintf("account:%d:seed:%s:hardware_v3", accountID, seed)))
+	h := sha256.Sum256([]byte(fmt.Sprintf("account:%d:seed:%s:hardware_v3_full", accountID, seed)))
 	n0 := binary.BigEndian.Uint64(h[0:8])
 	n1 := binary.BigEndian.Uint64(h[8:16])
 	n2 := binary.BigEndian.Uint64(h[16:24])
@@ -203,8 +238,13 @@ func ResolveHardwareProfile(accountID int64, seed string) HardwareProfile {
 	isMac := (n0 % 100) < 55
 	geo := usGeoCatalog[n1%uint64(len(usGeoCatalog))]
 	cv := chromeVersions[n2%uint64(len(chromeVersions))]
+	username := firstNames[n3%uint64(len(firstNames))]
+	projectName := developerProjectNames[(n0>>4)%uint64(len(developerProjectNames))]
+	branchList := []string{"main", "develop", "feat/auth", "fix/gateway"}
+	branch := branchList[n1%uint64(len(branchList))]
 
 	var p HardwareProfile
+	p.Username = username
 	p.City = geo.city
 	p.State = geo.state
 	p.Timezone = geo.timezone
@@ -213,6 +253,8 @@ func ResolveHardwareProfile(accountID int64, seed string) HardwareProfile {
 	p.ChromeFull = cv[1]
 	p.DownlinkMbps = 80 + int(n3%120) // 80 ~ 200 Mbps
 	p.NetworkRTT = 25 + int(n2%30)    // 25 ~ 55 ms
+	p.GitBranch = branch
+	p.IDEHost = "VSCode 1.96.2"
 
 	if isMac {
 		spec := macCatalog[n0%uint64(len(macCatalog))]
@@ -238,6 +280,10 @@ func ResolveHardwareProfile(accountID int64, seed string) HardwareProfile {
 		p.TerminalCols = spec.termCols
 		p.TerminalRows = spec.termRows
 		p.DefaultShell = "/bin/zsh"
+		p.HomeDir = fmt.Sprintf("/Users/%s", username)
+		p.WorkspacePath = fmt.Sprintf("/Users/%s/Projects/%s", username, projectName)
+		p.InstalledApps = macInstalledAppPool[n2%uint64(len(macInstalledAppPool))]
+		p.SystemFonts = macFontPool
 	} else {
 		spec := winCatalog[n0%uint64(len(winCatalog))]
 		p.DeviceModel = spec.model
@@ -262,14 +308,17 @@ func ResolveHardwareProfile(accountID int64, seed string) HardwareProfile {
 		p.TerminalCols = spec.termCols
 		p.TerminalRows = spec.termRows
 		p.DefaultShell = "powershell.exe"
+		p.HomeDir = fmt.Sprintf("C:\\Users\\%s", strings.Title(username))
+		p.WorkspacePath = fmt.Sprintf("C:\\Users\\%s\\source\\repos\\%s", strings.Title(username), projectName)
+		p.InstalledApps = winInstalledAppPool[n2%uint64(len(winInstalledAppPool))]
+		p.SystemFonts = winFontPool
 	}
 
-	// 内存堆上限与固态存储配额计算 (严格符合 Chromium 算法)
-	p.JSHeapLimit = int64(p.MemoryGB) * 1024 * 1024 * 1024 / 4 // 1/4 物理内存为堆限制
+	p.JSHeapLimit = int64(p.MemoryGB) * 1024 * 1024 * 1024 / 4
 	p.JSHeapTotal = 60*1024*1024 + int64(n1%40)*1024*1024
 	p.JSHeapUsed = p.JSHeapTotal - int64(n2%20)*1024*1024
-	p.StorageQuota = int64(p.SSDSizeGB) * 1024 * 1024 * 1024 / 3 // 约 1/3 磁盘为浏览器存储配额
-	p.StorageUsage = 2*1024*1024*1024 + int64(n0%4)*1024*1024*1024 // 2G ~ 6G 历史缓存
+	p.StorageQuota = int64(p.SSDSizeGB) * 1024 * 1024 * 1024 / 3
+	p.StorageUsage = 2*1024*1024*1024 + int64(n0%4)*1024*1024*1024
 
 	return p
 }
