@@ -277,6 +277,17 @@ type codexFingerprintIDs struct {
 	acceptLanguage                string
 	clientTimezone                string
 	chromeMajor                   string
+	osName                        string
+	osVersion                     string
+	arch                          string
+	cpuCores                      int
+	memoryGB                      int
+	screenWidth                   int
+	screenHeight                  int
+	availHeight                   int
+	dpr                           float64
+	terminalCols                  int
+	terminalRows                  int
 }
 
 // resolveCodexFingerprintIDs 按收敛模式计算出站 ID 集合。
@@ -299,13 +310,24 @@ func resolveCodexFingerprintIDs(account *Account, clientSessionID string, mode c
 		turnStartedAtUnixMs: time.Now().UnixMilli(),
 	}
 
-	// 采用工业级硬件与环境基因库派生真实美国个人电脑画像
+	// 采用工业级硬件与环境基因库派生真实美国个人电脑画像 (全自洽物理细节)
 	hwProfile := ResolveHardwareProfile(account.ID, seed)
 	ids.secPlatform = hwProfile.SecPlatform
 	ids.userAgent = fmt.Sprintf("codex_cli_rs/0.162.1 (%s) xterm-256color", hwProfile.PlatformUA)
 	ids.clientTimezone = hwProfile.Timezone
 	ids.acceptLanguage = hwProfile.AcceptLanguage
 	ids.chromeMajor = hwProfile.ChromeMajor
+	ids.osName = hwProfile.OSName
+	ids.osVersion = hwProfile.OSVersion
+	ids.arch = hwProfile.Arch
+	ids.cpuCores = hwProfile.CPUCores
+	ids.memoryGB = hwProfile.MemoryGB
+	ids.screenWidth = hwProfile.ScreenWidth
+	ids.screenHeight = hwProfile.ScreenHeight
+	ids.availHeight = hwProfile.AvailHeight
+	ids.dpr = hwProfile.DPR
+	ids.terminalCols = hwProfile.TerminalCols
+	ids.terminalRows = hwProfile.TerminalRows
 
 	ids.installationID = resolveConvergedInstallationID(account, seed)
 	if ids.installationID == "" {
@@ -484,11 +506,27 @@ func applyCodexFingerprintToClientMetadataMap(existing map[string]any, ids *code
 		return modified
 	}
 
-	// session / full 模式
+	// session / full 模式：收敛身份标识并补齐物理硬件与环境元数据
 	existing["session_id"] = ids.sessionID
 	existing["thread_id"] = ids.threadID
 	existing["turn_id"] = ids.turnID
 	existing["x-codex-window-id"] = ids.windowID
+
+	// 注入真实物理硬件环境元数据 (与 HTTP Headers 100% 呼应自洽)
+	if ids.osName != "" {
+		existing["os"] = ids.osName
+		existing["os_version"] = ids.osVersion
+		existing["arch"] = ids.arch
+		existing["cpu_cores"] = ids.cpuCores
+		existing["memory_gb"] = ids.memoryGB
+		existing["screen_width"] = ids.screenWidth
+		existing["screen_height"] = ids.screenHeight
+		existing["avail_height"] = ids.availHeight
+		existing["device_pixel_ratio"] = ids.dpr
+		existing["timezone"] = ids.clientTimezone
+		existing["terminal_cols"] = ids.terminalCols
+		existing["terminal_rows"] = ids.terminalRows
+	}
 
 	rewriteClientMetadataEmbeddedTurnMetadata(existing, map[string]any{
 		"installation_id":         ids.installationID,
