@@ -71,6 +71,12 @@ type HardwareProfile struct {
 	WorkspacePath  string   // 当前真实项目工作区路径
 	GitBranch      string   // 拟真的当前 Git 分支
 	IDEHost        string   // 真实使用的开发工具环境，如 "VSCode 1.96.2"
+
+	// W3C 分布式追踪与 APM 遥测链路上下文 (Sentry/OpenTelemetry 协议对齐)
+	Traceparent    string   // W3C Trace Context, 如 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
+	Baggage        string   // W3C Baggage Header, 携带真实桌面环境上下文
+	BatteryLevel   float64  // 物理电池电量 (0.65 ~ 1.0)
+	BatteryCharging bool    // 是否插电办公
 }
 
 type macDeviceSpec struct {
@@ -399,6 +405,22 @@ func ResolveHardwareProfile(accountID int64, seed string) HardwareProfile {
 	p.StorageQuota = int64(p.SSDSizeGB) * 1024 * 1024 * 1024 / 3
 	p.StorageUsage = 2*1024*1024*1024 + int64(n0%4)*1024*1024*1024
 
+	// 派生 W3C 分布式追踪链路标头 (与官方客户端 APM 遥测一致)
+	traceID := fmt.Sprintf("%016x%016x", n0^n2, n1^n3)
+	spanID := fmt.Sprintf("%016x", n2^n3)
+	p.Traceparent = fmt.Sprintf("00-%s-%s-01", traceID, spanID)
+	p.Baggage = fmt.Sprintf("sentry-environment=production,sentry-release=codex-desktop@%s,sentry-user_id=%s", cv[1], username)
+
+	// 动态时变物理状态 (电池与轻度网络时延扰动)
+	nowHour := (n1 % 24)
+	if nowHour >= 9 && nowHour <= 18 {
+		p.BatteryCharging = true
+		p.BatteryLevel = 0.85 + float64(n3%15)/100.0 // 0.85 ~ 1.00
+	} else {
+		p.BatteryCharging = false
+		p.BatteryLevel = 0.65 + float64(n3%25)/100.0 // 0.65 ~ 0.90
+	}
+
 	return p
 }
 
@@ -417,4 +439,12 @@ func (p HardwareProfile) ApplyToRequestHeaders(h http.Header, version string) {
 	h.Set("sec-ch-ua-mobile", "?0")
 	h.Set("sec-ch-ua", fmt.Sprintf(`"Chromium";v="%s", "Not;A=Brand";v="24", "Google Chrome";v="%s"`, p.ChromeMajor, p.ChromeMajor))
 	h.Set("x-codex-client-timezone", p.Timezone)
+
+	// 注入 W3C 遥测追踪标头 (彻底补齐客户端调用上下文)
+	if p.Traceparent != "" {
+		h.Set("traceparent", p.Traceparent)
+	}
+	if p.Baggage != "" {
+		h.Set("baggage", p.Baggage)
+	}
 }

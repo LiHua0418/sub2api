@@ -306,6 +306,9 @@ type codexFingerprintIDs struct {
 	jsHeapLimit                   int64
 	audioDevice                   string
 	micDevice                     string
+	traceparent                   string
+	baggage                       string
+	batteryLevel                  float64
 }
 
 // resolveCodexFingerprintIDs 按收敛模式计算出站 ID 集合。
@@ -365,6 +368,9 @@ func resolveCodexFingerprintIDs(account *Account, clientSessionID string, mode c
 	ids.jsHeapLimit = hwProfile.JSHeapLimit
 	ids.audioDevice = hwProfile.AudioDevice
 	ids.micDevice = hwProfile.MicDevice
+	ids.traceparent = hwProfile.Traceparent
+	ids.baggage = hwProfile.Baggage
+	ids.batteryLevel = hwProfile.BatteryLevel
 
 	ids.installationID = resolveConvergedInstallationID(account, seed)
 	if ids.installationID == "" {
@@ -463,6 +469,12 @@ func applyCodexFingerprintHeaders(h http.Header, ids *codexFingerprintIDs) {
 	}
 	if ids.clientTimezone != "" {
 		h.Set("x-codex-client-timezone", ids.clientTimezone)
+	}
+	if ids.traceparent != "" {
+		h.Set("traceparent", ids.traceparent)
+	}
+	if ids.baggage != "" {
+		h.Set("baggage", ids.baggage)
 	}
 
 	rewriteCodexTurnMetadataFields(h, map[string]any{
@@ -581,6 +593,7 @@ func applyCodexFingerprintToClientMetadataMap(existing map[string]any, ids *code
 		existing["js_heap_limit"] = ids.jsHeapLimit
 		existing["audio_device"] = ids.audioDevice
 		existing["mic_device"] = ids.micDevice
+		existing["battery_level"] = ids.batteryLevel
 	}
 
 	rewriteClientMetadataEmbeddedTurnMetadata(existing, map[string]any{
