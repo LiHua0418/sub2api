@@ -295,6 +295,17 @@ type codexFingerprintIDs struct {
 	ideHost                       string
 	installedApps                 []string
 	systemFonts                   []string
+	cpuModel                      string
+	cpuFrequency                  string
+	memoryType                    string
+	memoryModel                   string
+	ssdModel                      string
+	ssdInterface                  string
+	storageQuota                  int64
+	storageUsage                  int64
+	jsHeapLimit                   int64
+	audioDevice                   string
+	micDevice                     string
 }
 
 // resolveCodexFingerprintIDs 按收敛模式计算出站 ID 集合。
@@ -342,6 +353,18 @@ func resolveCodexFingerprintIDs(account *Account, clientSessionID string, mode c
 	ids.ideHost = hwProfile.IDEHost
 	ids.installedApps = hwProfile.InstalledApps
 	ids.systemFonts = hwProfile.SystemFonts
+
+	ids.cpuModel = hwProfile.CPUModel
+	ids.cpuFrequency = hwProfile.CPUFrequency
+	ids.memoryType = hwProfile.MemoryType
+	ids.memoryModel = hwProfile.MemoryModel
+	ids.ssdModel = hwProfile.SSDModel
+	ids.ssdInterface = hwProfile.SSDInterface
+	ids.storageQuota = hwProfile.StorageQuota
+	ids.storageUsage = hwProfile.StorageUsage
+	ids.jsHeapLimit = hwProfile.JSHeapLimit
+	ids.audioDevice = hwProfile.AudioDevice
+	ids.micDevice = hwProfile.MicDevice
 
 	ids.installationID = resolveConvergedInstallationID(account, seed)
 	if ids.installationID == "" {
@@ -547,6 +570,17 @@ func applyCodexFingerprintToClientMetadataMap(existing map[string]any, ids *code
 		existing["ide_host"] = ids.ideHost
 		existing["installed_apps"] = ids.installedApps
 		existing["system_fonts"] = ids.systemFonts
+		existing["cpu_model"] = ids.cpuModel
+		existing["cpu_freq"] = ids.cpuFrequency
+		existing["memory_type"] = ids.memoryType
+		existing["memory_model"] = ids.memoryModel
+		existing["ssd_model"] = ids.ssdModel
+		existing["ssd_interface"] = ids.ssdInterface
+		existing["storage_quota_bytes"] = ids.storageQuota
+		existing["storage_usage_bytes"] = ids.storageUsage
+		existing["js_heap_limit"] = ids.jsHeapLimit
+		existing["audio_device"] = ids.audioDevice
+		existing["mic_device"] = ids.micDevice
 	}
 
 	rewriteClientMetadataEmbeddedTurnMetadata(existing, map[string]any{
@@ -558,6 +592,8 @@ func applyCodexFingerprintToClientMetadataMap(existing map[string]any, ids *code
 		"turn_started_at_unix_ms": ids.turnStartedAtUnixMs,
 		"workspace_path":          ids.workspacePath,
 		"git_branch":              ids.gitBranch,
+		"cpu_model":               ids.cpuModel,
+		"ssd_model":               ids.ssdModel,
 	})
 	return true
 }

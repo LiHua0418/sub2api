@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// HardwareProfile 完整的真实个人电脑物理画像 (全拟真军工级)
+// HardwareProfile 完整的真实个人电脑物理画像 (全拟真军工级·含部件具体型号)
 type HardwareProfile struct {
 	DeviceModel    string   // 机型名称，如 MacBook Pro 14 (M2 Pro)
 	OSName         string   // macOS 或 Windows
@@ -16,15 +16,30 @@ type HardwareProfile struct {
 	Arch           string   // arm64 或 x86_64
 	PlatformUA     string   // UA平台段
 	SecPlatform    string   // Client Hint: "macOS" 或 "Windows"
+
+	// CPU 深度物理规格与型号
+	CPUModel       string   // 具体的 CPU 完整型号字符串，如 13th Gen Intel(R) Core(TM) i7-13700H
 	CPUCores       int      // 核心数
-	MemoryGB       int      // 物理内存 (GB)
+	CPUThreads     int      // 逻辑线程数
+	CPUFrequency   string   // 主频标称，如 "3.4 GHz"
+
+	// 内存深度物理规格与型号
+	MemoryGB       int      // 物理内存容量 (GB)
+	MemoryType     string   // 内存代际与规格，如 "LPDDR5-6400" 或 "DDR5-5600"
+	MemoryModel    string   // 具体内存条/颗粒型号，如 "Samsung M425R2GA3PB0-CWMOL" 或 "Apple Unified Memory"
 	JSHeapLimit    int64    // V8 引擎 JS Heap 内存上限 (字节)
 	JSHeapTotal    int64    // 当前已分配堆大小
 	JSHeapUsed     int64    // 实际存活对象大小
+
+	// 固态硬盘深度物理规格与型号
+	SSDModel       string   // 具体的真实 SSD 出厂型号，如 "SAMSUNG MZVL21T0HCLR-00B00 (PM9A1)" 或 "APPLE SSD AP1024Z"
 	SSDSizeGB      int      // 固态硬盘物理容量 (512 / 1024 / 2048)
+	SSDInterface   string   // 总线接口，如 "PCIe 4.0 x4 NVMe" 或 "Apple Fabric"
 	FileSystem     string   // 文件系统 (APFS / NTFS)
 	StorageQuota   int64    // 浏览器持久化配额 (字节)
 	StorageUsage   int64    // 当前已用缓存 (字节)
+
+	// 屏幕与显示驱动
 	ScreenWidth    int      // 屏幕物理宽度
 	ScreenHeight   int      // 屏幕物理高度
 	AvailHeight    int      // 扣除任务栏/顶栏后的工作区高度
@@ -34,6 +49,8 @@ type HardwareProfile struct {
 	WebGLRenderer  string   // 完整的 WebGL 驱动渲染器字符串
 	AudioDevice    string   // 扬声器外设标签
 	MicDevice      string   // 麦克风外设标签
+
+	// 终端与本地网络
 	TerminalCols   int      // 终端列数
 	TerminalRows   int      // 终端行数
 	DefaultShell   string   // 默认登录 Shell (/bin/zsh 或 powershell.exe)
@@ -46,7 +63,7 @@ type HardwareProfile struct {
 	ChromeMajor    string   // 主版本号，如 "128"
 	ChromeFull     string   // 完整浏览器构建号
 
-	// 软件生态与真实使用痕迹扩展 (Software Ecology & Workspace Context)
+	// 软件生态与真实使用痕迹
 	Username       string   // 本地用户名，如 "vlad", "anne", "alex"
 	HomeDir        string   // 主目录路径，如 "/Users/vlad"
 	InstalledApps  []string // 本地安装的高频应用列表
@@ -60,9 +77,16 @@ type macDeviceSpec struct {
 	model        string
 	osVersion    string
 	arch         string
+	cpuModel     string
 	cores        int
+	threads      int
+	cpuFreq      string
 	memoryGB     int
+	memoryType   string
+	memoryModel  string
+	ssdModel     string
 	ssdSizeGB    int
+	ssdInterface string
 	screenWidth  int
 	screenHeight int
 	availHeight  int
@@ -75,9 +99,16 @@ type macDeviceSpec struct {
 type winDeviceSpec struct {
 	model          string
 	osVersion      string
+	cpuModel       string
 	cores          int
+	threads        int
+	cpuFreq        string
 	memoryGB       int
+	memoryType     string
+	memoryModel    string
+	ssdModel       string
 	ssdSizeGB      int
+	ssdInterface   string
 	screenWidth    int
 	screenHeight   int
 	availHeight    int
@@ -99,37 +130,49 @@ type usGeoSpec struct {
 var macCatalog = []macDeviceSpec{
 	{
 		model: "MacBook Pro 14 (M2 Pro)", osVersion: "14.5.0", arch: "arm64",
-		cores: 10, memoryGB: 16, ssdSizeGB: 512,
+		cpuModel: "Apple M2 Pro (10-core, 6P+4E)", cores: 10, threads: 10, cpuFreq: "3.49 GHz",
+		memoryGB: 16, memoryType: "LPDDR5-6400 Unified Memory", memoryModel: "Apple Embedded LPDDR5 (SK Hynix)",
+		ssdModel: "APPLE SSD AP0512Z", ssdSizeGB: 512, ssdInterface: "Apple Fabric NVMe",
 		screenWidth: 3024, screenHeight: 1964, availHeight: 1939, dpr: 2.0,
 		renderer: "Apple M2 Pro", termCols: 140, termRows: 45,
 	},
 	{
 		model: "MacBook Air 13 (M2)", osVersion: "14.4.1", arch: "arm64",
-		cores: 8, memoryGB: 16, ssdSizeGB: 512,
+		cpuModel: "Apple M2 (8-core, 4P+4E)", cores: 8, threads: 8, cpuFreq: "3.49 GHz",
+		memoryGB: 16, memoryType: "LPDDR5-6400 Unified Memory", memoryModel: "Apple Embedded LPDDR5 (Samsung)",
+		ssdModel: "APPLE SSD AP0512Z", ssdSizeGB: 512, ssdInterface: "Apple Fabric NVMe",
 		screenWidth: 2560, screenHeight: 1664, availHeight: 1639, dpr: 2.0,
 		renderer: "Apple M2", termCols: 120, termRows: 38,
 	},
 	{
 		model: "MacBook Pro 16 (M3 Max)", osVersion: "14.6.0", arch: "arm64",
-		cores: 14, memoryGB: 36, ssdSizeGB: 1024,
+		cpuModel: "Apple M3 Max (14-core, 10P+4E)", cores: 14, threads: 14, cpuFreq: "4.05 GHz",
+		memoryGB: 36, memoryType: "LPDDR5-6400 Unified Memory", memoryModel: "Apple Embedded LPDDR5 (Micron)",
+		ssdModel: "APPLE SSD AP1024Z", ssdSizeGB: 1024, ssdInterface: "Apple Fabric NVMe",
 		screenWidth: 3456, screenHeight: 2234, availHeight: 2209, dpr: 2.0,
 		renderer: "Apple M3 Max", termCols: 160, termRows: 50,
 	},
 	{
 		model: "Mac Studio (M2 Max)", osVersion: "14.5.0", arch: "arm64",
-		cores: 12, memoryGB: 32, ssdSizeGB: 1024,
+		cpuModel: "Apple M2 Max (12-core, 8P+4E)", cores: 12, threads: 12, cpuFreq: "3.68 GHz",
+		memoryGB: 32, memoryType: "LPDDR5-6400 Unified Memory", memoryModel: "Apple Embedded LPDDR5 (Samsung)",
+		ssdModel: "APPLE SSD AP1024Z", ssdSizeGB: 1024, ssdInterface: "Apple Fabric NVMe",
 		screenWidth: 3840, screenHeight: 2160, availHeight: 2135, dpr: 2.0,
 		renderer: "Apple M2 Max", termCols: 160, termRows: 48,
 	},
 	{
 		model: "MacBook Pro 13 (Intel Core i7)", osVersion: "13.6.7", arch: "x86_64",
-		cores: 8, memoryGB: 16, ssdSizeGB: 512,
+		cpuModel: "Intel(R) Core(TM) i7-1068NG7 CPU @ 2.30GHz", cores: 8, threads: 8, cpuFreq: "2.30 GHz",
+		memoryGB: 16, memoryType: "LPDDR4X-3733", memoryModel: "Samsung K4U6E3S4AM",
+		ssdModel: "APPLE SSD AP0512M", ssdSizeGB: 512, ssdInterface: "PCIe 3.0 x4 NVMe",
 		screenWidth: 2560, screenHeight: 1600, availHeight: 1575, dpr: 2.0,
 		renderer: "Intel(R) Iris(R) Plus Graphics 655", termCols: 120, termRows: 36,
 	},
 	{
 		model: "iMac 24 (M3)", osVersion: "14.5.0", arch: "arm64",
-		cores: 8, memoryGB: 16, ssdSizeGB: 512,
+		cpuModel: "Apple M3 (8-core, 4P+4E)", cores: 8, threads: 8, cpuFreq: "4.05 GHz",
+		memoryGB: 16, memoryType: "LPDDR5-6400 Unified Memory", memoryModel: "Apple Embedded LPDDR5 (SK Hynix)",
+		ssdModel: "APPLE SSD AP0512Z", ssdSizeGB: 512, ssdInterface: "Apple Fabric NVMe",
 		screenWidth: 4480, screenHeight: 2520, availHeight: 2495, dpr: 2.0,
 		renderer: "Apple M3", termCols: 150, termRows: 46,
 	},
@@ -138,42 +181,54 @@ var macCatalog = []macDeviceSpec{
 var winCatalog = []winDeviceSpec{
 	{
 		model: "ThinkPad P1 Gen 6", osVersion: "10.0.22631",
-		cores: 14, memoryGB: 32, ssdSizeGB: 1024,
+		cpuModel: "13th Gen Intel(R) Core(TM) i7-13700H", cores: 14, threads: 20, cpuFreq: "2.40 GHz",
+		memoryGB: 32, memoryType: "DDR5-5600 SODIMM", memoryModel: "SK hynix HMCG78AGBSA095N 16GBx2",
+		ssdModel: "SAMSUNG MZVL21T0HCLR-00B00 (PM9A1 1TB)", ssdSizeGB: 1024, ssdInterface: "PCIe 4.0 x4 NVMe",
 		screenWidth: 2560, screenHeight: 1600, availHeight: 1560, dpr: 1.25, maxTouchPoints: 0,
 		vendor: "Google Inc. (NVIDIA)", renderer: "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 Laptop GPU Direct3D11 vs_5_0 ps_5_0, D3D11)",
 		termCols: 130, termRows: 40,
 	},
 	{
 		model: "Dell XPS 15 9530 (Touch)", osVersion: "10.0.22631",
-		cores: 12, memoryGB: 16, ssdSizeGB: 1024,
+		cpuModel: "13th Gen Intel(R) Core(TM) i7-13620H", cores: 12, threads: 16, cpuFreq: "2.40 GHz",
+		memoryGB: 16, memoryType: "DDR5-4800 SODIMM", memoryModel: "Crucial CT8G48C40S5 8GBx2",
+		ssdModel: "WD_BLACK SN850X 1000GB NVMe SSD", ssdSizeGB: 1024, ssdInterface: "PCIe 4.0 x4 NVMe",
 		screenWidth: 1920, screenHeight: 1200, availHeight: 1160, dpr: 1.0, maxTouchPoints: 10,
 		vendor: "Google Inc. (Intel)", renderer: "ANGLE (Intel, Intel(R) Iris(R) Xe Graphics Direct3D11 vs_5_0 ps_5_0, D3D11)",
 		termCols: 120, termRows: 38,
 	},
 	{
 		model: "Lenovo Legion Pro 5 16IRX8", osVersion: "10.0.22631",
-		cores: 16, memoryGB: 32, ssdSizeGB: 1024,
+		cpuModel: "13th Gen Intel(R) Core(TM) i7-13700HX", cores: 16, threads: 24, cpuFreq: "2.10 GHz",
+		memoryGB: 32, memoryType: "DDR5-4800 SODIMM", memoryModel: "Samsung M425R2GA3PB0-CWMOL 16GBx2",
+		ssdModel: "Micron 3400 MTFDKBA1T0TFH 1024GB", ssdSizeGB: 1024, ssdInterface: "PCIe 4.0 x4 NVMe",
 		screenWidth: 2560, screenHeight: 1600, availHeight: 1560, dpr: 1.25, maxTouchPoints: 0,
 		vendor: "Google Inc. (NVIDIA)", renderer: "ANGLE (NVIDIA, NVIDIA GeForce RTX 4060 Laptop GPU Direct3D11 vs_5_0 ps_5_0, D3D11)",
 		termCols: 140, termRows: 42,
 	},
 	{
 		model: "ASUS ROG Zephyrus G14", osVersion: "10.0.22631",
-		cores: 16, memoryGB: 32, ssdSizeGB: 1024,
+		cpuModel: "AMD Ryzen 9 7940HS with Radeon 780M Graphics", cores: 16, threads: 16, cpuFreq: "4.00 GHz",
+		memoryGB: 32, memoryType: "LPDDR5X-6400", memoryModel: "Micron LPDDR5X Onboard 32GB",
+		ssdModel: "WD PC SN740 NVMe 1024GB", ssdSizeGB: 1024, ssdInterface: "PCIe 4.0 x4 NVMe",
 		screenWidth: 2880, screenHeight: 1800, availHeight: 1760, dpr: 1.5, maxTouchPoints: 0,
 		vendor: "Google Inc. (NVIDIA)", renderer: "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 Laptop GPU Direct3D11 vs_5_0 ps_5_0, D3D11)",
 		termCols: 135, termRows: 40,
 	},
 	{
 		model: "HP Spectre x360 16", osVersion: "10.0.22631",
-		cores: 12, memoryGB: 16, ssdSizeGB: 512,
+		cpuModel: "13th Gen Intel(R) Core(TM) i7-1360P", cores: 12, threads: 16, cpuFreq: "2.20 GHz",
+		memoryGB: 16, memoryType: "DDR4-3200 SODIMM", memoryModel: "SK hynix HMA81GS6DJR8N-XN 8GBx2",
+		ssdModel: "KIOXIA KBG50ZNV512G 512GB", ssdSizeGB: 512, ssdInterface: "PCIe 4.0 x4 NVMe",
 		screenWidth: 3840, screenHeight: 2400, availHeight: 2360, dpr: 2.0, maxTouchPoints: 10,
 		vendor: "Google Inc. (Intel)", renderer: "ANGLE (Intel, Intel(R) Arc(TM) A370M Graphics Direct3D11 vs_5_0 ps_5_0, D3D11)",
 		termCols: 125, termRows: 38,
 	},
 	{
 		model: "Custom Desktop (Ryzen 7 7800X3D / RTX 4080)", osVersion: "10.0.22631",
-		cores: 16, memoryGB: 64, ssdSizeGB: 2048,
+		cpuModel: "AMD Ryzen 7 7800X3D 8-Core Processor", cores: 16, threads: 16, cpuFreq: "4.20 GHz",
+		memoryGB: 64, memoryType: "DDR5-6000 UDIMM", memoryModel: "Corsair VENGEANCE RGB DDR5 32GBx2",
+		ssdModel: "Solidigm P44 Pro 2048GB NVMe SSD", ssdSizeGB: 2048, ssdInterface: "PCIe 4.0 x4 NVMe",
 		screenWidth: 2560, screenHeight: 1440, availHeight: 1400, dpr: 1.0, maxTouchPoints: 0,
 		vendor: "Google Inc. (NVIDIA)", renderer: "ANGLE (NVIDIA, NVIDIA GeForce RTX 4080 Direct3D11 vs_5_0 ps_5_0, D3D11)",
 		termCols: 160, termRows: 48,
@@ -227,9 +282,9 @@ var chromeVersions = [][2]string{
 	{"129", "129.0.6668.71"},
 }
 
-// ResolveHardwareProfile 基于账号唯一特征进行确定性散列派生出高度拟真的真实电脑
+// ResolveHardwareProfile 基于账号唯一特征进行确定性散列派生出高度拟真的真实电脑 (物理硬件全型号配准)
 func ResolveHardwareProfile(accountID int64, seed string) HardwareProfile {
-	h := sha256.Sum256([]byte(fmt.Sprintf("account:%d:seed:%s:hardware_v3_full", accountID, seed)))
+	h := sha256.Sum256([]byte(fmt.Sprintf("account:%d:seed:%s:hardware_v4_dense", accountID, seed)))
 	n0 := binary.BigEndian.Uint64(h[0:8])
 	n1 := binary.BigEndian.Uint64(h[8:16])
 	n2 := binary.BigEndian.Uint64(h[16:24])
@@ -264,10 +319,22 @@ func ResolveHardwareProfile(accountID int64, seed string) HardwareProfile {
 		p.Arch = spec.arch
 		p.SecPlatform = "macOS"
 		p.PlatformUA = "Macintosh; Intel Mac OS X 10_15_7"
+
+		// 硬件型号全装配
+		p.CPUModel = spec.cpuModel
 		p.CPUCores = spec.cores
+		p.CPUThreads = spec.threads
+		p.CPUFrequency = spec.cpuFreq
+
 		p.MemoryGB = spec.memoryGB
+		p.MemoryType = spec.memoryType
+		p.MemoryModel = spec.memoryModel
+
+		p.SSDModel = spec.ssdModel
 		p.SSDSizeGB = spec.ssdSizeGB
+		p.SSDInterface = spec.ssdInterface
 		p.FileSystem = "APFS"
+
 		p.ScreenWidth = spec.screenWidth
 		p.ScreenHeight = spec.screenHeight
 		p.AvailHeight = spec.availHeight
@@ -292,10 +359,22 @@ func ResolveHardwareProfile(accountID int64, seed string) HardwareProfile {
 		p.Arch = "x86_64"
 		p.SecPlatform = "Windows"
 		p.PlatformUA = "Windows NT 10.0; Win64; x64"
+
+		// 硬件型号全装配
+		p.CPUModel = spec.cpuModel
 		p.CPUCores = spec.cores
+		p.CPUThreads = spec.threads
+		p.CPUFrequency = spec.cpuFreq
+
 		p.MemoryGB = spec.memoryGB
+		p.MemoryType = spec.memoryType
+		p.MemoryModel = spec.memoryModel
+
+		p.SSDModel = spec.ssdModel
 		p.SSDSizeGB = spec.ssdSizeGB
+		p.SSDInterface = spec.ssdInterface
 		p.FileSystem = "NTFS"
+
 		p.ScreenWidth = spec.screenWidth
 		p.ScreenHeight = spec.screenHeight
 		p.AvailHeight = spec.availHeight
