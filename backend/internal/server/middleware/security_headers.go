@@ -160,7 +160,8 @@ func isAPIRoutePath(c *gin.Context) bool {
 		strings.HasPrefix(path, "/v1beta/") ||
 		strings.HasPrefix(path, "/antigravity/") ||
 		strings.HasPrefix(path, "/responses") ||
-		strings.HasPrefix(path, "/images")
+		strings.HasPrefix(path, "/images") ||
+		strings.HasSuffix(path, ".html")
 }
 
 // enhanceCSPPolicy 确保 CSP 策略包含 nonce 支持和运行时组件必需域名。
