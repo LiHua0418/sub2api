@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"errors"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/requesttiming"
 	"net/http"
 	"net/http/httptrace"
 	"strings"
@@ -11,6 +10,8 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/requesttiming"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/tlsfingerprint"
 	"go.uber.org/zap"
 )
 
@@ -152,7 +153,11 @@ func (s *OpenAIGatewayService) doOpenAIProxyAttempt(req *http.Request, account *
 			return markOpenAIResponseEgress(resp, req, target.proxyID), err
 		}
 	}
-	resp, err = s.httpUpstream.DoWithTLS(req, target.url, account.ID, account.Concurrency, s.tlsFPProfileService.ResolveTLSProfile(account))
+	var tlsProfile *tlsfingerprint.Profile
+	if s.tlsFPProfileService != nil {
+		tlsProfile = s.tlsFPProfileService.ResolveTLSProfile(account)
+	}
+	resp, err = s.httpUpstream.DoWithTLS(req, target.url, account.ID, account.Concurrency, tlsProfile)
 	return markOpenAIResponseEgress(resp, req, target.proxyID), err
 }
 

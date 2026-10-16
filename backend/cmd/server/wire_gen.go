@@ -187,6 +187,7 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 		Quotas:        serviceUserPlatformQuotaRepository,
 		RPMCache:      rpmCache,
 		Harvest:       codexHarvestService,
+		TLSProfiles:   tlsFingerprintProfileService,
 	}
 	openAIGatewayService := service.ProvideOpenAIGatewayService(openAIGatewayDependencies)
 	geminiOAuthClient := repository.NewGeminiOAuthClient(configConfig)
