@@ -314,6 +314,12 @@ type codexFingerprintIDs struct {
 	gitRemoteOrigin               string
 	parentProcess                 string
 	refreshRate                   int
+	keyboardModel                 string
+	keyboardLayout                string
+	mouseModel                    string
+	pointerType                   string
+	hasTrackpad                   bool
+	hasTrackpoint                 bool
 }
 
 // resolveCodexFingerprintIDs 按收敛模式计算出站 ID 集合。
@@ -381,6 +387,12 @@ func resolveCodexFingerprintIDs(account *Account, clientSessionID string, mode c
 	ids.gitRemoteOrigin = hwProfile.GitRemoteOrigin
 	ids.parentProcess = hwProfile.ParentProcess
 	ids.refreshRate = hwProfile.RefreshRate
+	ids.keyboardModel = hwProfile.KeyboardModel
+	ids.keyboardLayout = hwProfile.KeyboardLayout
+	ids.mouseModel = hwProfile.MouseModel
+	ids.pointerType = hwProfile.PointerType
+	ids.hasTrackpad = hwProfile.HasTrackpad
+	ids.hasTrackpoint = hwProfile.HasTrackpoint
 
 	ids.installationID = resolveConvergedInstallationID(account, seed)
 	if ids.installationID == "" {
@@ -609,6 +621,12 @@ func applyCodexFingerprintToClientMetadataMap(existing map[string]any, ids *code
 		existing["git_remote_origin"] = ids.gitRemoteOrigin
 		existing["parent_process"] = ids.parentProcess
 		existing["refresh_rate"] = ids.refreshRate
+		existing["keyboard_model"] = ids.keyboardModel
+		existing["keyboard_layout"] = ids.keyboardLayout
+		existing["mouse_model"] = ids.mouseModel
+		existing["pointer_type"] = ids.pointerType
+		existing["has_trackpad"] = ids.hasTrackpad
+		existing["has_trackpoint"] = ids.hasTrackpoint
 	}
 
 	rewriteClientMetadataEmbeddedTurnMetadata(existing, map[string]any{

@@ -96,29 +96,43 @@ type HardwareProfile struct {
 	JA4Fingerprint   string   // 平台匹配的拟真 JA4 签名字符串
 	BatteryLevel     float64  // 物理电池电量 (0.65 ~ 1.0)
 	BatteryCharging  bool     // 是否插电办公
+
+	// 键盘、鼠标与交互外设生态 (Human Interface Devices - HID Profile)
+	KeyboardModel    string   // 物理键盘出厂型号与布局 (如 "Apple Internal Keyboard (ANSI US)")
+	KeyboardLayout   string   // 键盘布局代码 (美式 "00000409" / "com.apple.keylayout.US")
+	MouseModel       string   // 物理鼠标/指针设备型号 (如 "Logitech MX Master 3S" 或 "Apple Force Touch Trackpad")
+	PointerType      string   // 指针设备类型: "touchpad" / "mouse"
+	HasTrackpad      bool     // 是否具备内置触控板
+	HasTrackpoint    bool     // 是否具备 ThinkPad 专属小红点指示设备
 }
 
 type macDeviceSpec struct {
-	model        string
-	osVersion    string
-	arch         string
-	cpuModel     string
-	cores        int
-	threads      int
-	cpuFreq      string
-	memoryGB     int
-	memoryType   string
-	memoryModel  string
-	ssdModel     string
-	ssdSizeGB    int
-	ssdInterface string
-	screenWidth  int
-	screenHeight int
-	availHeight  int
-	dpr          float64
-	renderer     string
-	termCols     int
-	termRows     int
+	model          string
+	osVersion      string
+	arch           string
+	cpuModel       string
+	cores          int
+	threads        int
+	cpuFreq        string
+	memoryGB       int
+	memoryType     string
+	memoryModel    string
+	ssdModel       string
+	ssdSizeGB      int
+	ssdInterface   string
+	screenWidth    int
+	screenHeight   int
+	availHeight    int
+	dpr            float64
+	renderer       string
+	termCols       int
+	termRows       int
+	keyboardModel  string
+	keyboardLayout string
+	mouseModel     string
+	pointerType    string
+	hasTrackpad    bool
+	hasTrackpoint  bool
 }
 
 type winDeviceSpec struct {
@@ -143,6 +157,12 @@ type winDeviceSpec struct {
 	renderer       string
 	termCols       int
 	termRows       int
+	keyboardModel  string
+	keyboardLayout string
+	mouseModel     string
+	pointerType    string
+	hasTrackpad    bool
+	hasTrackpoint  bool
 }
 
 type usGeoSpec struct {
@@ -160,6 +180,9 @@ var macCatalog = []macDeviceSpec{
 		ssdModel: "APPLE SSD AP0512Z", ssdSizeGB: 512, ssdInterface: "Apple Fabric NVMe",
 		screenWidth: 3024, screenHeight: 1964, availHeight: 1939, dpr: 2.0,
 		renderer: "Apple M2 Pro", termCols: 140, termRows: 45,
+		keyboardModel: "Apple Internal Keyboard (ANSI US Layout)", keyboardLayout: "com.apple.keylayout.US",
+		mouseModel: "Apple Force Touch Trackpad", pointerType: "touchpad",
+		hasTrackpad: true, hasTrackpoint: false,
 	},
 	{
 		model: "MacBook Air 13 (M2)", osVersion: "14.4.1", arch: "arm64",
@@ -168,6 +191,9 @@ var macCatalog = []macDeviceSpec{
 		ssdModel: "APPLE SSD AP0512Z", ssdSizeGB: 512, ssdInterface: "Apple Fabric NVMe",
 		screenWidth: 2560, screenHeight: 1664, availHeight: 1639, dpr: 2.0,
 		renderer: "Apple M2", termCols: 120, termRows: 38,
+		keyboardModel: "Apple Internal Keyboard (ANSI US Layout)", keyboardLayout: "com.apple.keylayout.US",
+		mouseModel: "Apple Force Touch Trackpad", pointerType: "touchpad",
+		hasTrackpad: true, hasTrackpoint: false,
 	},
 	{
 		model: "MacBook Pro 16 (M3 Max)", osVersion: "14.6.0", arch: "arm64",
@@ -176,6 +202,9 @@ var macCatalog = []macDeviceSpec{
 		ssdModel: "APPLE SSD AP1024Z", ssdSizeGB: 1024, ssdInterface: "Apple Fabric NVMe",
 		screenWidth: 3456, screenHeight: 2234, availHeight: 2209, dpr: 2.0,
 		renderer: "Apple M3 Max", termCols: 160, termRows: 50,
+		keyboardModel: "Apple Internal Keyboard (ANSI US Layout)", keyboardLayout: "com.apple.keylayout.US",
+		mouseModel: "Logitech MX Master 3S for Mac (Bluetooth)", pointerType: "mouse",
+		hasTrackpad: true, hasTrackpoint: false,
 	},
 	{
 		model: "Mac Studio (M2 Max)", osVersion: "14.5.0", arch: "arm64",
@@ -184,6 +213,9 @@ var macCatalog = []macDeviceSpec{
 		ssdModel: "APPLE SSD AP1024Z", ssdSizeGB: 1024, ssdInterface: "Apple Fabric NVMe",
 		screenWidth: 3840, screenHeight: 2160, availHeight: 2135, dpr: 2.0,
 		renderer: "Apple M2 Max", termCols: 160, termRows: 48,
+		keyboardModel: "Apple Magic Keyboard with Touch ID and Numeric Keypad", keyboardLayout: "com.apple.keylayout.US",
+		mouseModel: "Apple Magic Mouse (Multi-Touch)", pointerType: "mouse",
+		hasTrackpad: false, hasTrackpoint: false,
 	},
 	{
 		model: "MacBook Pro 13 (Intel Core i7)", osVersion: "13.6.7", arch: "x86_64",
@@ -192,6 +224,9 @@ var macCatalog = []macDeviceSpec{
 		ssdModel: "APPLE SSD AP0512M", ssdSizeGB: 512, ssdInterface: "PCIe 3.0 x4 NVMe",
 		screenWidth: 2560, screenHeight: 1600, availHeight: 1575, dpr: 2.0,
 		renderer: "Intel(R) Iris(R) Plus Graphics 655", termCols: 120, termRows: 36,
+		keyboardModel: "Apple Internal Keyboard (ANSI US Layout)", keyboardLayout: "com.apple.keylayout.US",
+		mouseModel: "Apple Force Touch Trackpad", pointerType: "touchpad",
+		hasTrackpad: true, hasTrackpoint: false,
 	},
 	{
 		model: "iMac 24 (M3)", osVersion: "14.5.0", arch: "arm64",
@@ -200,6 +235,9 @@ var macCatalog = []macDeviceSpec{
 		ssdModel: "APPLE SSD AP0512Z", ssdSizeGB: 512, ssdInterface: "Apple Fabric NVMe",
 		screenWidth: 4480, screenHeight: 2520, availHeight: 2495, dpr: 2.0,
 		renderer: "Apple M3", termCols: 150, termRows: 46,
+		keyboardModel: "Apple Magic Keyboard with Touch ID", keyboardLayout: "com.apple.keylayout.US",
+		mouseModel: "Apple Magic Trackpad (Multi-Touch)", pointerType: "touchpad",
+		hasTrackpad: true, hasTrackpoint: false,
 	},
 }
 
@@ -212,6 +250,9 @@ var winCatalog = []winDeviceSpec{
 		screenWidth: 2560, screenHeight: 1600, availHeight: 1560, dpr: 1.25, maxTouchPoints: 0,
 		vendor: "Google Inc. (NVIDIA)", renderer: "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 Laptop GPU Direct3D11 vs_5_0 ps_5_0, D3D11)",
 		termCols: 130, termRows: 40,
+		keyboardModel: "ThinkPad UltraNav Backlit Keyboard (US Layout)", keyboardLayout: "00000409",
+		mouseModel: "Synaptics Precision Touchpad & TrackPoint", pointerType: "touchpad",
+		hasTrackpad: true, hasTrackpoint: true,
 	},
 	{
 		model: "Dell XPS 15 9530 (Touch)", osVersion: "10.0.22631",
@@ -221,6 +262,9 @@ var winCatalog = []winDeviceSpec{
 		screenWidth: 1920, screenHeight: 1200, availHeight: 1160, dpr: 1.0, maxTouchPoints: 10,
 		vendor: "Google Inc. (Intel)", renderer: "ANGLE (Intel, Intel(R) Iris(R) Xe Graphics Direct3D11 vs_5_0 ps_5_0, D3D11)",
 		termCols: 120, termRows: 38,
+		keyboardModel: "Dell Standard Backlit Keyboard (US Layout)", keyboardLayout: "00000409",
+		mouseModel: "Logitech MX Master 3S Wireless Mouse", pointerType: "mouse",
+		hasTrackpad: true, hasTrackpoint: false,
 	},
 	{
 		model: "Lenovo Legion Pro 5 16IRX8", osVersion: "10.0.22631",
@@ -230,6 +274,9 @@ var winCatalog = []winDeviceSpec{
 		screenWidth: 2560, screenHeight: 1600, availHeight: 1560, dpr: 1.25, maxTouchPoints: 0,
 		vendor: "Google Inc. (NVIDIA)", renderer: "ANGLE (NVIDIA, NVIDIA GeForce RTX 4060 Laptop GPU Direct3D11 vs_5_0 ps_5_0, D3D11)",
 		termCols: 140, termRows: 42,
+		keyboardModel: "Legion TrueStrike 4-Zone RGB Gaming Keyboard", keyboardLayout: "00000409",
+		mouseModel: "Logitech G PRO X SUPERLIGHT Wireless Gaming Mouse", pointerType: "mouse",
+		hasTrackpad: true, hasTrackpoint: false,
 	},
 	{
 		model: "ASUS ROG Zephyrus G14", osVersion: "10.0.22631",
@@ -239,6 +286,9 @@ var winCatalog = []winDeviceSpec{
 		screenWidth: 2880, screenHeight: 1800, availHeight: 1760, dpr: 1.5, maxTouchPoints: 0,
 		vendor: "Google Inc. (NVIDIA)", renderer: "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 Laptop GPU Direct3D11 vs_5_0 ps_5_0, D3D11)",
 		termCols: 135, termRows: 40,
+		keyboardModel: "ROG Overstroke Chiclet RGB Keyboard", keyboardLayout: "00000409",
+		mouseModel: "Razer DeathAdder V3 Pro Wireless", pointerType: "mouse",
+		hasTrackpad: true, hasTrackpoint: false,
 	},
 	{
 		model: "HP Spectre x360 16", osVersion: "10.0.22631",
@@ -248,6 +298,9 @@ var winCatalog = []winDeviceSpec{
 		screenWidth: 3840, screenHeight: 2400, availHeight: 2360, dpr: 2.0, maxTouchPoints: 10,
 		vendor: "Google Inc. (Intel)", renderer: "ANGLE (Intel, Intel(R) Arc(TM) A370M Graphics Direct3D11 vs_5_0 ps_5_0, D3D11)",
 		termCols: 125, termRows: 38,
+		keyboardModel: "HP Premium Quiet Backlit Keyboard", keyboardLayout: "00000409",
+		mouseModel: "Synaptics Precision Glass Touchpad", pointerType: "touchpad",
+		hasTrackpad: true, hasTrackpoint: false,
 	},
 	{
 		model: "Custom Desktop (Ryzen 7 7800X3D / RTX 4080)", osVersion: "10.0.22631",
@@ -257,6 +310,9 @@ var winCatalog = []winDeviceSpec{
 		screenWidth: 2560, screenHeight: 1440, availHeight: 1400, dpr: 1.0, maxTouchPoints: 0,
 		vendor: "Google Inc. (NVIDIA)", renderer: "ANGLE (NVIDIA, NVIDIA GeForce RTX 4080 Direct3D11 vs_5_0 ps_5_0, D3D11)",
 		termCols: 160, termRows: 48,
+		keyboardModel: "Keychron Q1 Pro Wireless Custom Mechanical Keyboard", keyboardLayout: "00000409",
+		mouseModel: "Logitech G502 X PLUS LIGHTSPEED Wireless Gaming Mouse", pointerType: "mouse",
+		hasTrackpad: false, hasTrackpoint: false,
 	},
 }
 
@@ -376,6 +432,12 @@ func ResolveHardwareProfile(accountID int64, seed string) HardwareProfile {
 		p.WorkspacePath = fmt.Sprintf("/Users/%s/Projects/%s", username, projectName)
 		p.InstalledApps = macInstalledAppPool[n2%uint64(len(macInstalledAppPool))]
 		p.SystemFonts = macFontPool
+		p.KeyboardModel = spec.keyboardModel
+		p.KeyboardLayout = spec.keyboardLayout
+		p.MouseModel = spec.mouseModel
+		p.PointerType = spec.pointerType
+		p.HasTrackpad = spec.hasTrackpad
+		p.HasTrackpoint = spec.hasTrackpoint
 	} else {
 		spec := winCatalog[n0%uint64(len(winCatalog))]
 		p.DeviceModel = spec.model
@@ -416,6 +478,12 @@ func ResolveHardwareProfile(accountID int64, seed string) HardwareProfile {
 		p.WorkspacePath = fmt.Sprintf("C:\\Users\\%s\\source\\repos\\%s", strings.Title(username), projectName)
 		p.InstalledApps = winInstalledAppPool[n2%uint64(len(winInstalledAppPool))]
 		p.SystemFonts = winFontPool
+		p.KeyboardModel = spec.keyboardModel
+		p.KeyboardLayout = spec.keyboardLayout
+		p.MouseModel = spec.mouseModel
+		p.PointerType = spec.pointerType
+		p.HasTrackpad = spec.hasTrackpad
+		p.HasTrackpoint = spec.hasTrackpoint
 	}
 
 	p.JSHeapLimit = int64(p.MemoryGB) * 1024 * 1024 * 1024 / 4
