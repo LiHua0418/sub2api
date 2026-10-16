@@ -72,11 +72,30 @@ type HardwareProfile struct {
 	GitBranch      string   // 拟真的当前 Git 分支
 	IDEHost        string   // 真实使用的开发工具环境，如 "VSCode 1.96.2"
 
-	// W3C 分布式追踪与 APM 遥测链路上下文 (Sentry/OpenTelemetry 协议对齐)
-	Traceparent    string   // W3C Trace Context, 如 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
-	Baggage        string   // W3C Baggage Header, 携带真实桌面环境上下文
-	BatteryLevel   float64  // 物理电池电量 (0.65 ~ 1.0)
-	BatteryCharging bool    // 是否插电办公
+	// 第二部分：终端 Shell 深度交互与开发环境变量链 (Terminal & Shell Ecology)
+	TermType         string   // 终端类型: "xterm-256color"
+	ColorTerm        string   // 颜色支持: "truecolor"
+	ParentProcess    string   // 父进程: "/bin/zsh" 或 "pwsh.exe"
+	ShellPlugins     string   // Shell插件链条: "zsh-autosuggestions,zsh-syntax-highlighting"
+	EnvPaths         []string // 开发者关键环境变量路径 (GOPATH, CARGO_HOME, NVM_DIR)
+
+	// 第三部分：微观 Git 仓储深层状态 (Git Repository Micro-Context)
+	GitCommitSHA     string   // 40位真实合法 SHA-1 Commit Hash
+	GitDirtyFilesCount int    // 未暂存修改文件数 (1 ~ 3)
+	GitRemoteOrigin  string   // 真实 Git Remote Origin URL
+
+	// 第五部分：浏览器权限与窗口活动上下文 (Window & Viewport Activity)
+	RefreshRate      int      // 物理刷新率 (60 / 120 / 165 Hz)
+	WindowState      string   // 窗口状态: "maximized"
+	DocumentHidden   bool     // 页面可见性: false
+	WindowFocused    bool     // 窗口焦点: true
+
+	// 第一部分：W3C 遥测追踪与 L4/TLS 指纹签名 (APM & Transport Fingerprint)
+	Traceparent      string   // W3C Trace Context, 如 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
+	Baggage          string   // W3C Baggage Header, 携带真实桌面环境上下文
+	JA4Fingerprint   string   // 平台匹配的拟真 JA4 签名字符串
+	BatteryLevel     float64  // 物理电池电量 (0.65 ~ 1.0)
+	BatteryCharging  bool     // 是否插电办公
 }
 
 type macDeviceSpec struct {
@@ -419,6 +438,56 @@ func ResolveHardwareProfile(accountID int64, seed string) HardwareProfile {
 	} else {
 		p.BatteryCharging = false
 		p.BatteryLevel = 0.65 + float64(n3%25)/100.0 // 0.65 ~ 0.90
+	}
+
+	// 第二部分：终端 Shell 交互与开发环境变量链 (Terminal & Shell Ecology)
+	p.TermType = "xterm-256color"
+	p.ColorTerm = "truecolor"
+	if isMac {
+		p.ParentProcess = "/bin/zsh"
+		p.ShellPlugins = "zsh-autosuggestions,zsh-syntax-highlighting"
+		p.EnvPaths = []string{
+			fmt.Sprintf("HOME=/Users/%s", username),
+			"/opt/homebrew/bin",
+			fmt.Sprintf("GOPATH=/Users/%s/go", username),
+			fmt.Sprintf("CARGO_HOME=/Users/%s/.cargo", username),
+			fmt.Sprintf("NVM_DIR=/Users/%s/.nvm", username),
+		}
+	} else {
+		p.ParentProcess = "pwsh.exe"
+		p.ShellPlugins = "PSReadLine"
+		p.EnvPaths = []string{
+			fmt.Sprintf("USERPROFILE=C:\\Users\\%s", strings.Title(username)),
+			fmt.Sprintf("APPDATA=C:\\Users\\%s\\AppData\\Roaming", strings.Title(username)),
+			fmt.Sprintf("LOCALAPPDATA=C:\\Users\\%s\\AppData\\Local", strings.Title(username)),
+			fmt.Sprintf("GOPATH=C:\\Users\\%s\\go", strings.Title(username)),
+		}
+	}
+
+	// 第三部分：微观 Git 仓储深层状态 (Git Repository Micro-Context)
+	commitH := sha256.Sum256([]byte(fmt.Sprintf("%s:%s:git_head", projectName, seed)))
+	p.GitCommitSHA = fmt.Sprintf("%x", commitH)[:40] // 40位标准合法 SHA-1 模拟
+	p.GitDirtyFilesCount = 1 + int(n2%3)             // 1 ~ 3 个未暂存文件
+	p.GitRemoteOrigin = fmt.Sprintf("git@github.com:enterprise-org/%s.git", projectName)
+
+	// 第五部分：浏览器窗口与刷新率上下文 (Window Activity)
+	p.WindowState = "maximized"
+	p.DocumentHidden = false
+	p.WindowFocused = true
+	if isMac {
+		if strings.Contains(p.DeviceModel, "Pro 14") || strings.Contains(p.DeviceModel, "Pro 16") {
+			p.RefreshRate = 120 // ProMotion 自适应高刷
+		} else {
+			p.RefreshRate = 60
+		}
+		p.JA4Fingerprint = "t13d1516h2_8daaf6152771_01669480cb9d"
+	} else {
+		if strings.Contains(p.DeviceModel, "Legion") || strings.Contains(p.DeviceModel, "ROG") {
+			p.RefreshRate = 165 // 游戏高刷屏
+		} else {
+			p.RefreshRate = 60
+		}
+		p.JA4Fingerprint = "t13d1516h2_8daaf6152771_b1860882e796"
 	}
 
 	return p

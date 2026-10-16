@@ -309,6 +309,11 @@ type codexFingerprintIDs struct {
 	traceparent                   string
 	baggage                       string
 	batteryLevel                  float64
+	gitCommitSHA                  string
+	gitDirtyFilesCount            int
+	gitRemoteOrigin               string
+	parentProcess                 string
+	refreshRate                   int
 }
 
 // resolveCodexFingerprintIDs 按收敛模式计算出站 ID 集合。
@@ -371,6 +376,11 @@ func resolveCodexFingerprintIDs(account *Account, clientSessionID string, mode c
 	ids.traceparent = hwProfile.Traceparent
 	ids.baggage = hwProfile.Baggage
 	ids.batteryLevel = hwProfile.BatteryLevel
+	ids.gitCommitSHA = hwProfile.GitCommitSHA
+	ids.gitDirtyFilesCount = hwProfile.GitDirtyFilesCount
+	ids.gitRemoteOrigin = hwProfile.GitRemoteOrigin
+	ids.parentProcess = hwProfile.ParentProcess
+	ids.refreshRate = hwProfile.RefreshRate
 
 	ids.installationID = resolveConvergedInstallationID(account, seed)
 	if ids.installationID == "" {
@@ -594,6 +604,11 @@ func applyCodexFingerprintToClientMetadataMap(existing map[string]any, ids *code
 		existing["audio_device"] = ids.audioDevice
 		existing["mic_device"] = ids.micDevice
 		existing["battery_level"] = ids.batteryLevel
+		existing["git_commit_sha"] = ids.gitCommitSHA
+		existing["git_dirty_files"] = ids.gitDirtyFilesCount
+		existing["git_remote_origin"] = ids.gitRemoteOrigin
+		existing["parent_process"] = ids.parentProcess
+		existing["refresh_rate"] = ids.refreshRate
 	}
 
 	rewriteClientMetadataEmbeddedTurnMetadata(existing, map[string]any{
@@ -605,6 +620,7 @@ func applyCodexFingerprintToClientMetadataMap(existing map[string]any, ids *code
 		"turn_started_at_unix_ms": ids.turnStartedAtUnixMs,
 		"workspace_path":          ids.workspacePath,
 		"git_branch":              ids.gitBranch,
+		"git_commit_sha":          ids.gitCommitSHA,
 		"cpu_model":               ids.cpuModel,
 		"ssd_model":               ids.ssdModel,
 	})
