@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 )
 
 // W3CTraceEpochWindowMs 定义 8 小时自然工时时序窗口 (8 * 3600 * 1000 毫秒)
@@ -251,6 +252,10 @@ func ResolveHardwareProfile(accountID int64, seed string) HardwareProfile {
 // - 路径 1: 若 upstreamTraceparent 合法，继承其 trace_id，基于上游 span_id 与 turnStartedAtUnixMs 衍生合法子 span_id（杜绝全零），返回 00-{traceID}-{childSpanID}-01；
 // - 路径 2: 若无或非法，计算 epoch := turnStartedAtUnixMs / W3CTraceEpochWindowMs，基于 (accountID, seed, sessionID, epoch) 派生 32-hex traceID（杜绝全零），由 (traceID, turnStartedAtUnixMs) 派生 16-hex spanID（杜绝全零），返回 00-{traceID}-{spanID}-01。
 func DeriveTraceparentWithUpstream(upstreamTraceparent string, accountID int64, seed, sessionID string, turnStartedAtUnixMs int64) string {
+	if turnStartedAtUnixMs <= 0 {
+		turnStartedAtUnixMs = time.Now().UnixMilli()
+	}
+
 	if parsed, ok := ParseW3CTraceparent(upstreamTraceparent); ok {
 		// 继承上游 trace_id，基于上游 span_id 与 turnStartedAtUnixMs 衍生合法子 span_id (杜绝全零)
 		hChildSpan := sha256.Sum256([]byte(fmt.Sprintf("%s:%s:%d:child_span", parsed.TraceID, parsed.SpanID, turnStartedAtUnixMs)))

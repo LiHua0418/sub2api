@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -1278,6 +1279,22 @@ func TestDeriveTraceparentWithUpstream_MalformedAndZeroFallback(t *testing.T) {
 		assert.Equal(t, "00", p.Version)
 		assert.Equal(t, "01", p.Flags)
 	}
+
+	t.Run("turnStartedAtUnixMs 为 0 或负数时自动防御归一化", func(t *testing.T) {
+		tpZero := DeriveTraceparentWithUpstream("", accountID, seed, sessionID, 0)
+		pZero, okZero := ParseW3CTraceparent(tpZero)
+		require.True(t, okZero)
+		assert.False(t, isAllZeroHex(pZero.TraceID))
+		assert.False(t, isAllZeroHex(pZero.SpanID))
+		assert.False(t, strings.Contains(pZero.TraceID, "-"))
+
+		tpNeg := DeriveTraceparentWithUpstream("", accountID, seed, sessionID, -50000000)
+		pNeg, okNeg := ParseW3CTraceparent(tpNeg)
+		require.True(t, okNeg)
+		assert.False(t, isAllZeroHex(pNeg.TraceID))
+		assert.False(t, isAllZeroHex(pNeg.SpanID))
+		assert.False(t, strings.Contains(pNeg.TraceID, "-"))
+	})
 }
 
 func TestResolveCodexFingerprintIDsFromRequest_TraceparentExtraction(t *testing.T) {
@@ -1298,5 +1315,18 @@ func TestResolveCodexFingerprintIDsFromRequest_TraceparentExtraction(t *testing.
 	require.True(t, ok)
 	assert.Equal(t, "4bf92f3577b34da6a3ce929d0e0e4736", p.TraceID, "必须继承请求头中的合法上游 trace_id")
 	assert.NotEqual(t, "00f067aa0ba902b7", p.SpanID, "必须演化生成新子 span_id")
+
+	// 验证请求体 client_metadata 中的 traceparent 必须与出站 Header 里的 traceparent 100% 镜像一致
+	bodyMap := map[string]any{
+		"model": "gpt-5.6-sol",
+		"client_metadata": map[string]any{
+			"session_id":  "test-client-sess",
+			"traceparent": "00-stale-stale-01",
+		},
+	}
+	applyCodexFingerprintClientMetadata(bodyMap, ids)
+	cm, _ := bodyMap["client_metadata"].(map[string]any)
+	require.NotNil(t, cm)
+	assert.Equal(t, ids.traceparent, cm["traceparent"], "请求体中的 traceparent 必须与出站 Header 里的 traceparent 100% 镜像一致，杜绝头体撕裂")
 }
 

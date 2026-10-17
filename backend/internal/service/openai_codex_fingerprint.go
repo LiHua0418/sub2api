@@ -554,6 +554,12 @@ func applyCodexFingerprintToClientMetadataMap(existing map[string]any, ids *code
 	existing["thread_id"] = ids.threadID
 	existing["turn_id"] = ids.turnID
 	existing["x-codex-window-id"] = ids.windowID
+	if ids.traceparent != "" {
+		// 严密同步: 若 client_metadata 带有 traceparent，必须与出站 Header 里的 traceparent 100% 镜像一致，杜绝头体撕裂
+		if _, exists := existing["traceparent"]; exists {
+			existing["traceparent"] = ids.traceparent
+		}
+	}
 
 	// 注入真实终端原生环境元数据 (100% 贴合官方 codex_cli_rs 运行时协议，杜绝任何非标/沙箱穿透伪造)
 	if ids.osName != "" {
