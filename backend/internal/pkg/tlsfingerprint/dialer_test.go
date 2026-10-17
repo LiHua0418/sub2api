@@ -264,6 +264,75 @@ func TestBuildClientHelloSpec(t *testing.T) {
 	}
 }
 
+// TestNewCodexCLIRustlsProfile tests the creation and values of the Codex CLI (rustls) TLS profile.
+func TestNewCodexCLIRustlsProfile(t *testing.T) {
+	profile := NewCodexCLIRustlsProfile()
+	if profile == nil {
+		t.Fatal("expected profile to be non-nil")
+	}
+
+	if profile.Name != "Codex CLI (rustls)" {
+		t.Errorf("unexpected name: %s", profile.Name)
+	}
+
+	if profile.EnableGREASE {
+		t.Error("expected EnableGREASE to be false")
+	}
+
+	// Verify 9 pure AEAD cipher suites (no CBC, no plain RSA)
+	if len(profile.CipherSuites) != 9 {
+		t.Fatalf("expected 9 cipher suites, got %d", len(profile.CipherSuites))
+	}
+	expectedCiphers := []uint16{
+		0x1302, 0x1301, 0x1303,
+		0xc02c, 0xc02b, 0xcca9, 0xc030, 0xc02f, 0xcca8,
+	}
+	for i, c := range profile.CipherSuites {
+		if c != expectedCiphers[i] {
+			t.Errorf("cipher [%d]: expected 0x%04x, got 0x%04x", i, expectedCiphers[i], c)
+		}
+	}
+
+	// Verify 8 signature algorithms (no SHA1: 0x0201 excluded)
+	if len(profile.SignatureAlgorithms) != 8 {
+		t.Fatalf("expected 8 signature algorithms, got %d", len(profile.SignatureAlgorithms))
+	}
+	expectedSigAlgs := []uint16{
+		0x0403, 0x0804, 0x0401, 0x0503, 0x0805, 0x0501, 0x0806, 0x0601,
+	}
+	for i, s := range profile.SignatureAlgorithms {
+		if s != expectedSigAlgs[i] {
+			t.Errorf("sigalg [%d]: expected 0x%04x, got 0x%04x", i, expectedSigAlgs[i], s)
+		}
+		if s == 0x0201 {
+			t.Error("expected rsa_pkcs1_sha1 (0x0201) to be excluded")
+		}
+	}
+
+	// Verify strictly 9 extensions
+	if len(profile.Extensions) != 9 {
+		t.Fatalf("expected 9 extensions, got %d", len(profile.Extensions))
+	}
+	expectedExts := []uint16{0, 23, 10, 11, 13, 16, 43, 51, 45}
+	for i, e := range profile.Extensions {
+		if e != expectedExts[i] {
+			t.Errorf("extension [%d]: expected %d, got %d", i, expectedExts[i], e)
+		}
+	}
+
+	// Verify buildClientHelloSpecFromProfile produces ClientHelloSpec correctly
+	spec := buildClientHelloSpecFromProfile(profile)
+	if spec == nil {
+		t.Fatal("expected spec to be non-nil")
+	}
+	if len(spec.CipherSuites) != 9 {
+		t.Errorf("spec expected 9 cipher suites, got %d", len(spec.CipherSuites))
+	}
+	if len(spec.Extensions) != 9 {
+		t.Errorf("spec expected 9 extensions, got %d", len(spec.Extensions))
+	}
+}
+
 // TestToUTLSCurves tests curve ID conversion.
 func TestToUTLSCurves(t *testing.T) {
 	input := []uint16{0x001d, 0x0017, 0x0018}

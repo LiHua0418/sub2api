@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/tlsfingerprint"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/upstreamroute"
 	"github.com/Wei-Shaw/sub2api/internal/requestcapture"
 	"golang.org/x/sync/errgroup"
@@ -2156,6 +2157,10 @@ func (p *openAIWSConnPool) dialConn(ctx context.Context, req openAIWSAcquireRequ
 	}
 	if req.Account != nil {
 		ctx = upstreamroute.WithAccountID(ctx, req.Account.ID)
+		if req.Account.IsOpenAIOAuth() {
+			profile := tlsfingerprint.NewCodexCLIRustlsProfile()
+			ctx = WithWSTLSProfile(ctx, profile)
+		}
 	}
 	conn, status, handshakeHeaders, err := p.clientDialer.Dial(ctx, req.WSURL, headers, req.ProxyURL)
 	if err != nil {

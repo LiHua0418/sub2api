@@ -190,15 +190,9 @@ func (s *TLSFingerprintProfileService) ResolveTLSProfile(account *Account) *tlsf
 			return p
 		}
 	}
-	// TLS 启用但无绑定 profile → 空 Profile → dialer 使用内置默认值
+	// TLS 启用但无绑定 profile → 如果是 OpenAI OAuth 账号，使用官方 Codex CLI (rustls) 指纹；否则使用内置默认值
 	if account.IsOpenAIOAuth() {
-		return &tlsfingerprint.Profile{
-			Name:         "Codex CLI Native Profile",
-			EnableGREASE: true,
-			// 注意：Go 标准库 http.Transport 对自定义 DialTLSContext 协商出的 h2 缺乏原生帧调度支持，
-			// 必须保持 HTTP/1.1 管道，由 utls 负责完整的真实 L4 密码套件与扩展签名
-			ALPNProtocols: []string{"http/1.1"},
-		}
+		return tlsfingerprint.NewCodexCLIRustlsProfile()
 	}
 	return &tlsfingerprint.Profile{Name: "Built-in Default (Node.js 24.x)"}
 }

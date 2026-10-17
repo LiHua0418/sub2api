@@ -115,7 +115,69 @@ var (
 		0x0601, // rsa_pkcs1_sha512
 		0x0201, // rsa_pkcs1_sha1
 	}
+
+	// codexCLICipherSuites contains the 9 pure modern AEAD cipher suites used by rustls (e.g. Codex CLI rs).
+	// Strictly no RSA key exchange and no CBC legacy ciphers.
+	codexCLICipherSuites = []uint16{
+		// TLS 1.3 suites
+		0x1302, // TLS_AES_256_GCM_SHA384
+		0x1301, // TLS_AES_128_GCM_SHA256
+		0x1303, // TLS_CHACHA20_POLY1305_SHA256
+
+		// TLS 1.2 ECDHE AEAD suites
+		0xc02c, // TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+		0xc02b, // TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+		0xcca9, // TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256
+		0xc030, // TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+		0xc02f, // TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+		0xcca8, // TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256
+	}
+
+	// codexCLISignatureAlgorithms contains the 8 standard signature algorithms from rustls, excluding SHA1.
+	codexCLISignatureAlgorithms = []uint16{
+		0x0403, // ecdsa_secp256r1_sha256
+		0x0804, // rsa_pss_rsae_sha256
+		0x0401, // rsa_pkcs1_sha256
+		0x0503, // ecdsa_secp384r1_sha384
+		0x0805, // rsa_pss_rsae_sha384
+		0x0501, // rsa_pkcs1_sha384
+		0x0806, // rsa_pss_rsae_sha512
+		0x0601, // rsa_pkcs1_sha512
+	}
+
+	// codexCLIExtensions contains strictly 9 extensions matching rustls ClientHello:
+	// 0: server_name, 23: extended_master_secret, 10: supported_groups, 11: ec_point_formats,
+	// 13: signature_algorithms, 16: alpn, 43: supported_versions, 51: key_share, 45: psk_key_exchange_modes.
+	codexCLIExtensions = []uint16{
+		0,  // server_name
+		23, // extended_master_secret
+		10, // supported_groups
+		11, // ec_point_formats
+		13, // signature_algorithms
+		16, // alpn
+		43, // supported_versions
+		51, // key_share
+		45, // psk_key_exchange_modes
+	}
 )
+
+// NewCodexCLIRustlsProfile creates a Profile modeling the native Codex CLI (rustls) TLS fingerprint.
+// Pure modern AEAD cipher suites, no legacy CBC/RSA, no SHA1, strict 9 extensions, no GREASE.
+func NewCodexCLIRustlsProfile() *Profile {
+	return &Profile{
+		Name:                "Codex CLI (rustls)",
+		EnableGREASE:        false,
+		CipherSuites:        codexCLICipherSuites,
+		Curves:              []uint16{0x001d, 0x0017, 0x0018}, // X25519, CurveP256, CurveP384
+		PointFormats:        []uint16{0},                      // uncompressed
+		SignatureAlgorithms: codexCLISignatureAlgorithms,
+		ALPNProtocols:       []string{"http/1.1"},
+		SupportedVersions:   []uint16{utls.VersionTLS13, utls.VersionTLS12},
+		KeyShareGroups:      []uint16{0x001d}, // X25519
+		PSKModes:            []uint16{uint16(utls.PskModeDHE)},
+		Extensions:          codexCLIExtensions,
+	}
+}
 
 // NewDialer creates a new TLS fingerprint dialer.
 // baseDialer is used for TCP connection establishment (supports proxy scenarios).

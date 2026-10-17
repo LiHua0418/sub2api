@@ -12,6 +12,7 @@ import (
 	"time"
 
 	coderws "github.com/coder/websocket"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/tlsfingerprint"
 	"github.com/stretchr/testify/require"
 )
 
@@ -85,8 +86,9 @@ func TestCoderOpenAIWSClientDialer_ProxyClientCacheIdleTTL(t *testing.T) {
 	_, err := impl.proxyHTTPClient(oldProxy)
 	require.NoError(t, err)
 
+	oldCacheKey := oldProxy + ":default"
 	impl.proxyMu.Lock()
-	oldEntry := impl.proxyClients[oldProxy]
+	oldEntry := impl.proxyClients[oldCacheKey]
 	require.NotNil(t, oldEntry)
 	oldEntry.lastUsedUnixNano = time.Now().Add(-openAIWSProxyClientCacheIdleTTL - time.Minute).UnixNano()
 	impl.proxyMu.Unlock()
@@ -96,7 +98,7 @@ func TestCoderOpenAIWSClientDialer_ProxyClientCacheIdleTTL(t *testing.T) {
 	require.NoError(t, err)
 
 	impl.proxyMu.Lock()
-	_, exists := impl.proxyClients[oldProxy]
+	_, exists := impl.proxyClients[oldCacheKey]
 	impl.proxyMu.Unlock()
 
 	require.False(t, exists, "超过空闲 TTL 的代理客户端应被回收")
@@ -115,6 +117,50 @@ func TestCoderOpenAIWSClientDialer_ProxyTransportTLSHandshakeTimeout(t *testing.
 	require.True(t, ok)
 	require.NotNil(t, transport)
 	require.Equal(t, 10*time.Second, transport.TLSHandshakeTimeout)
+}
+
+func TestCoderOpenAIWSClientDialer_WSTLSProfileDirectAndProxy(t *testing.T) {
+	dialer := newDefaultOpenAIWSClientDialer()
+	impl, ok := dialer.(*coderOpenAIWSClientDialer)
+	require.True(t, ok)
+
+	profile := tlsfingerprint.NewCodexCLIRustlsProfile()
+
+	// 1. 直连 + Profile: 能够成功创建 client 且带有 DialTLSContext
+	directClient, err := impl.proxyHTTPClientWithProfile("", profile)
+	require.NoError(t, err)
+	require.NotNil(t, directClient)
+	directTransport, ok := directClient.Transport.(*http.Transport)
+	require.True(t, ok)
+	require.NotNil(t, directTransport.DialTLSContext)
+	require.False(t, directTransport.ForceAttemptHTTP2)
+
+	// 2. HTTP 代理 + Profile
+	httpProxyClient, err := impl.proxyHTTPClientWithProfile("http://127.0.0.1:8080", profile)
+	require.NoError(t, err)
+	require.NotNil(t, httpProxyClient)
+	httpTransport, ok := httpProxyClient.Transport.(*http.Transport)
+	require.True(t, ok)
+	require.NotNil(t, httpTransport.DialTLSContext)
+	require.False(t, httpTransport.ForceAttemptHTTP2)
+
+	// 3. SOCKS5 代理 + Profile
+	socks5ProxyClient, err := impl.proxyHTTPClientWithProfile("socks5://127.0.0.1:1080", profile)
+	require.NoError(t, err)
+	require.NotNil(t, socks5ProxyClient)
+	socks5Transport, ok := socks5ProxyClient.Transport.(*http.Transport)
+	require.True(t, ok)
+	require.NotNil(t, socks5Transport.DialTLSContext)
+	require.False(t, socks5Transport.ForceAttemptHTTP2)
+
+	// 4. 复用测试：相同 proxy 和相同 profile 应该命中缓存
+	directClient2, err := impl.proxyHTTPClientWithProfile("", profile)
+	require.NoError(t, err)
+	require.Same(t, directClient, directClient2)
+
+	// 5. 无 profile 的直连调用仍报错 empty proxy
+	_, err = impl.proxyHTTPClientWithProfile("", nil)
+	require.Error(t, err)
 }
 
 func TestCoderOpenAIWSClientConn_DoesNotSupportIdlePingWithoutReader(t *testing.T) {
