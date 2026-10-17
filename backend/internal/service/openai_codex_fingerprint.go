@@ -415,9 +415,10 @@ func applyCodexFingerprintHeaders(h http.Header, ids *codexFingerprintIDs) {
 	// session / full 模式：改写所有相关头
 	h.Set("x-codex-window-id", ids.windowID)
 	h.Set("x-client-request-id", ids.threadID)
-	// 连字符形式和下划线形式都改写，保证一致
+	// 连字符形式、下划线形式以及 conversation_id 都统一收敛，保证绝对一致
 	h.Set("session-id", ids.sessionID)
 	h.Set("session_id", ids.sessionID)
+	h.Set("conversation_id", ids.sessionID)
 	h.Set("thread-id", ids.threadID)
 
 	// 注入真实终端环境指纹 (纯原生终端规范：UA、系统语言、本地时区、W3C APM 遥测，绝对不带 sec-ch-ua 浏览器头)
@@ -451,15 +452,14 @@ func applyCodexFingerprintHeaders(h http.Header, ids *codexFingerprintIDs) {
 }
 
 // rewriteCodexTurnMetadataFields 解析 x-codex-turn-metadata 头中的 JSON，
-// 替换指定字段后回写。合法对象保留未指定字段（如 sandbox、thread_source）；
-// 非法/非对象值重建为最小合法 metadata，避免 flat 与 embedded identity 分裂。
+// 替换指定字段后回写。若原请求未携带该头，则以指定字段自动初始化并注入，
+// 确保任何客户端（即使是轻量或非官方客户端）都能拥有官方 codex_cli_rs 必须具备的轮次元数据头。
 func rewriteCodexTurnMetadataFields(h http.Header, fields map[string]any) {
 	raw := strings.TrimSpace(h.Get("x-codex-turn-metadata"))
-	if raw == "" {
-		return
-	}
 	var metadata map[string]any
-	if err := json.Unmarshal([]byte(raw), &metadata); err != nil || metadata == nil {
+	if raw == "" {
+		metadata = make(map[string]any, len(fields))
+	} else if err := json.Unmarshal([]byte(raw), &metadata); err != nil || metadata == nil {
 		metadata = make(map[string]any, len(fields))
 	}
 	for k, v := range fields {
