@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/tlsfingerprint"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
@@ -81,7 +82,11 @@ func (s *OpenAIGatewayService) QualifyCodexTicketFullBlood(ctx context.Context, 
 	req.Header.Set("user-agent", "codex_cli_rs/0.162.1 (Ubuntu 22.4.0; x86_64) xterm-256color")
 
 	proxy := openAIAccountProxyURL(account)
-	resp, err := s.httpUpstream.Do(req, proxy, account.ID, account.Concurrency)
+	var tlsProfile *tlsfingerprint.Profile
+	if s.tlsFPProfileService != nil {
+		tlsProfile = s.tlsFPProfileService.ResolveTLSProfile(account)
+	}
+	resp, err := s.httpUpstream.DoWithTLS(req, proxy, account.ID, account.Concurrency, tlsProfile)
 	if err != nil || resp == nil {
 		return false
 	}
@@ -166,7 +171,11 @@ func (s *OpenAIGatewayService) checkTicketCandyProblem(ctx context.Context, acco
 	} else {
 		req.Header.Set("session_id", uuid.NewString())
 	}
-	resp, err := s.httpUpstream.Do(req, proxy, account.ID, account.Concurrency)
+	var tlsProfile *tlsfingerprint.Profile
+	if s.tlsFPProfileService != nil {
+		tlsProfile = s.tlsFPProfileService.ResolveTLSProfile(account)
+	}
+	resp, err := s.httpUpstream.DoWithTLS(req, proxy, account.ID, account.Concurrency, tlsProfile)
 	if err != nil || resp == nil {
 		logger.L().Warn("codex_ticket_qualifier checkTicketCandyProblem request error", zap.Error(err), zap.String("gateway", ticket.Gateway))
 		return false
@@ -291,7 +300,11 @@ func (s *OpenAIGatewayService) checkTicketPelicanAnimation(ctx context.Context, 
 	} else {
 		req.Header.Set("session_id", uuid.NewString())
 	}
-	resp, err := s.httpUpstream.Do(req, proxy, account.ID, account.Concurrency)
+	var tlsProfile *tlsfingerprint.Profile
+	if s.tlsFPProfileService != nil {
+		tlsProfile = s.tlsFPProfileService.ResolveTLSProfile(account)
+	}
+	resp, err := s.httpUpstream.DoWithTLS(req, proxy, account.ID, account.Concurrency, tlsProfile)
 	if err != nil || resp == nil {
 		return false
 	}
@@ -441,7 +454,11 @@ func (s *OpenAIGatewayService) MintPristineTurn0State(ctx context.Context, accou
 		req.Header.Del("user-agent")
 	}
 
-	resp, err := s.httpUpstream.Do(req, proxy, account.ID, account.Concurrency)
+	var tlsProfile *tlsfingerprint.Profile
+	if s.tlsFPProfileService != nil {
+		tlsProfile = s.tlsFPProfileService.ResolveTLSProfile(account)
+	}
+	resp, err := s.httpUpstream.DoWithTLS(req, proxy, account.ID, account.Concurrency, tlsProfile)
 	if err != nil || resp == nil {
 		return ""
 	}
