@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"maps"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -822,10 +823,10 @@ func applyCodexFingerprintToClientMetadataMap(existing map[string]any, ids *code
 		existing["os"] = ids.osName
 		existing["os_version"] = ids.osVersion
 		existing["arch"] = ids.arch
-		existing["cpu_cores"] = ids.cpuCores
-		existing["memory_gb"] = ids.memoryGB
-		existing["terminal_cols"] = ids.terminalCols
-		existing["terminal_rows"] = ids.terminalRows
+		existing["cpu_cores"] = strconv.Itoa(ids.cpuCores)
+		existing["memory_gb"] = strconv.Itoa(ids.memoryGB)
+		existing["terminal_cols"] = strconv.Itoa(ids.terminalCols)
+		existing["terminal_rows"] = strconv.Itoa(ids.terminalRows)
 		existing["workspace_path"] = ids.workspacePath
 		existing["git_branch"] = ids.gitBranch
 	}
