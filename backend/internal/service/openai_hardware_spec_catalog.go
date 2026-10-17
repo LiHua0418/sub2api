@@ -3,10 +3,89 @@ package service
 import (
 	"crypto/sha256"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"net/http"
 	"strings"
 )
+
+// W3CTraceEpochWindowMs 定义 8 小时自然工时时序窗口 (8 * 3600 * 1000 毫秒)
+const W3CTraceEpochWindowMs int64 = 8 * 3600 * 1000
+
+// ParsedTraceparent 解析后的 W3C Trace Context 结构
+type ParsedTraceparent struct {
+	Version string
+	TraceID string
+	SpanID  string
+	Flags   string
+}
+
+// ParseW3CTraceparent 校验并解析 W3C traceparent 字符串。
+// 标准格式为 55 字符: 00-{32hex}-{16hex}-{2hex}。
+// 规则：
+// 1. 严格 55 字符，4 段以 '-' 分隔；
+// 2. 严禁 version == "ff"；
+// 3. 严禁 trace_id 或 span_id 为全零；
+// 4. 所有字段必须为有效十六进制字符。
+func ParseW3CTraceparent(raw string) (*ParsedTraceparent, bool) {
+	raw = strings.TrimSpace(raw)
+	if len(raw) != 55 {
+		return nil, false
+	}
+	parts := strings.Split(raw, "-")
+	if len(parts) != 4 {
+		return nil, false
+	}
+	ver, traceID, spanID, flags := parts[0], parts[1], parts[2], parts[3]
+	if len(ver) != 2 || len(traceID) != 32 || len(spanID) != 16 || len(flags) != 2 {
+		return nil, false
+	}
+	if strings.ToLower(ver) == "ff" {
+		return nil, false
+	}
+	if !isAllHex(ver) || !isAllHex(traceID) || !isAllHex(spanID) || !isAllHex(flags) {
+		return nil, false
+	}
+	// 严禁 trace_id 或 span_id 为全零
+	if isAllZeroHex(traceID) || isAllZeroHex(spanID) {
+		return nil, false
+	}
+
+	return &ParsedTraceparent{
+		Version: strings.ToLower(ver),
+		TraceID: strings.ToLower(traceID),
+		SpanID:  strings.ToLower(spanID),
+		Flags:   strings.ToLower(flags),
+	}, true
+}
+
+func isAllHex(s string) bool {
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F') {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+func isAllZeroHex(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] != '0' {
+			return false
+		}
+	}
+	return true
+}
+
+// ensureNonZeroHex 确保十六进制字符串非全零，若为全零则末位置 '1'
+func ensureNonZeroHex(s string) string {
+	if isAllZeroHex(s) && len(s) > 0 {
+		return s[:len(s)-1] + "1"
+	}
+	return s
+}
 
 // HardwareProfile 终端原生环境画像 (100% 贴合官方 codex_cli_rs 运行时协议)
 type HardwareProfile struct {
@@ -159,26 +238,40 @@ func ResolveHardwareProfile(accountID int64, seed string) HardwareProfile {
 		p.WorkspacePath = fmt.Sprintf("C:\\Users\\%s\\source\\repos\\%s", strings.Title(username), projectName)
 	}
 
-	// 派生 W3C 分布式追踪链路标头 (与官方客户端 APM 遥测一致)
-	traceID := fmt.Sprintf("%016x%016x", n0^n2, n1^n3)
-	spanID := fmt.Sprintf("%016x", n2^n3)
+	// 派生 W3C 分布式追踪链路标头 (引入自然 Epoch 与全零防御，与官方客户端 APM 遥测一致)
+	traceID := ensureNonZeroHex(fmt.Sprintf("%016x%016x", n0^n2, n1^n3))
+	spanID := ensureNonZeroHex(fmt.Sprintf("%016x", n2^n3))
 	p.Traceparent = fmt.Sprintf("00-%s-%s-01", traceID, spanID)
 	p.Baggage = fmt.Sprintf("sentry-environment=production,sentry-release=codex-cli@0.162.1,sentry-user_id=%s", username)
 
 	return p
 }
 
-// DeriveTraceparent 依据会话标识确定性派生 W3C Trace Context (trace_id 随会话稳定，span_id 随轮次步进演化)
-func DeriveTraceparent(accountID int64, seed, sessionID string, turnStartedAtUnixMs int64) string {
-	// 会话级主 Trace ID: 32位合法十六进制，同会话/Session 恒定
-	hTrace := sha256.Sum256([]byte(fmt.Sprintf("%d:%s:%s:trace_root", accountID, seed, sessionID)))
-	traceID := fmt.Sprintf("%032x", hTrace[:16])
+// DeriveTraceparentWithUpstream 依据上游链路上下文或自然 Epoch 派生 W3C Trace Context：
+// - 路径 1: 若 upstreamTraceparent 合法，继承其 trace_id，基于上游 span_id 与 turnStartedAtUnixMs 衍生合法子 span_id（杜绝全零），返回 00-{traceID}-{childSpanID}-01；
+// - 路径 2: 若无或非法，计算 epoch := turnStartedAtUnixMs / W3CTraceEpochWindowMs，基于 (accountID, seed, sessionID, epoch) 派生 32-hex traceID（杜绝全零），由 (traceID, turnStartedAtUnixMs) 派生 16-hex spanID（杜绝全零），返回 00-{traceID}-{spanID}-01。
+func DeriveTraceparentWithUpstream(upstreamTraceparent string, accountID int64, seed, sessionID string, turnStartedAtUnixMs int64) string {
+	if parsed, ok := ParseW3CTraceparent(upstreamTraceparent); ok {
+		// 继承上游 trace_id，基于上游 span_id 与 turnStartedAtUnixMs 衍生合法子 span_id (杜绝全零)
+		hChildSpan := sha256.Sum256([]byte(fmt.Sprintf("%s:%s:%d:child_span", parsed.TraceID, parsed.SpanID, turnStartedAtUnixMs)))
+		childSpanID := ensureNonZeroHex(hex.EncodeToString(hChildSpan[:8]))
+		return fmt.Sprintf("00-%s-%s-01", parsed.TraceID, childSpanID)
+	}
 
-	// 轮次级动态 Span ID: 16位合法十六进制，由该轮交互的时间戳和会话确定性演化
+	// 路径 2: 降级/自生成：引入 8 小时自然工时 Epoch 与全零防御
+	epoch := turnStartedAtUnixMs / W3CTraceEpochWindowMs
+	hTrace := sha256.Sum256([]byte(fmt.Sprintf("%d:%s:%s:%d:trace_root", accountID, seed, sessionID, epoch)))
+	traceID := ensureNonZeroHex(hex.EncodeToString(hTrace[:16]))
+
 	hSpan := sha256.Sum256([]byte(fmt.Sprintf("%s:%d:span_node", traceID, turnStartedAtUnixMs)))
-	spanID := fmt.Sprintf("%016x", hSpan[:8])
+	spanID := ensureNonZeroHex(hex.EncodeToString(hSpan[:8]))
 
 	return fmt.Sprintf("00-%s-%s-01", traceID, spanID)
+}
+
+// DeriveTraceparent 依据会话标识确定性派生 W3C Trace Context (保持兼容性，内部调用 DeriveTraceparentWithUpstream)
+func DeriveTraceparent(accountID int64, seed, sessionID string, turnStartedAtUnixMs int64) string {
+	return DeriveTraceparentWithUpstream("", accountID, seed, sessionID, turnStartedAtUnixMs)
 }
 
 // ApplyToRequestHeaders 统一将该画像注入 HTTP Headers (完全纯净原生终端契约，绝对无任何浏览器专属头)

@@ -1155,3 +1155,148 @@ func TestApplyCodexFingerprintClientMetadataRaw_NonObjectBodyUntouched(t *testin
 		assert.Equal(t, []byte(body), out)
 	}
 }
+
+// --- W3C Trace 链路步进引擎测试 ---
+
+func TestParseW3CTraceparent(t *testing.T) {
+	// 合法测试
+	valid := "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+	p, ok := ParseW3CTraceparent(valid)
+	require.True(t, ok)
+	require.NotNil(t, p)
+	assert.Equal(t, "00", p.Version)
+	assert.Equal(t, "4bf92f3577b34da6a3ce929d0e0e4736", p.TraceID)
+	assert.Equal(t, "00f067aa0ba902b7", p.SpanID)
+	assert.Equal(t, "01", p.Flags)
+
+	// 非法测试
+	invalidCases := []struct {
+		name string
+		raw  string
+	}{
+		{"长度不足", "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7"},
+		{"分段数错误", "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01-extra"},
+		{"版本为ff", "ff-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"},
+		{"traceID全零", "00-00000000000000000000000000000000-00f067aa0ba902b7-01"},
+		{"spanID全零", "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000000-01"},
+		{"包含非hex字符", "00-4bf92f3577b34da6a3ce929d0e0e473g-00f067aa0ba902b7-01"},
+	}
+
+	for _, tc := range invalidCases {
+		t.Run(tc.name, func(t *testing.T) {
+			parsed, valid := ParseW3CTraceparent(tc.raw)
+			assert.False(t, valid, "应判定为非法 traceparent: %s", tc.raw)
+			assert.Nil(t, parsed)
+		})
+	}
+}
+
+func TestDeriveTraceparentWithUpstream_InheritValidUpstream(t *testing.T) {
+	upstream := "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+	accountID := int64(1001)
+	seed := "9f8c6d3e-5b2a-4f1c-8e7d-3a1b5c9e2f4a"
+	sessionID := "sess-upstream-test"
+	turnTime1 := int64(1700000000000)
+	turnTime2 := int64(1700000005000)
+
+	derived1 := DeriveTraceparentWithUpstream(upstream, accountID, seed, sessionID, turnTime1)
+	p1, ok1 := ParseW3CTraceparent(derived1)
+	require.True(t, ok1, "派生结果必须为有效 W3C traceparent")
+	assert.Equal(t, "4bf92f3577b34da6a3ce929d0e0e4736", p1.TraceID, "必须继承上游 trace_id")
+	assert.NotEqual(t, "00f067aa0ba902b7", p1.SpanID, "子 span_id 必须与上游父 span_id 不同")
+	assert.False(t, isAllZeroHex(p1.SpanID), "子 span_id 杜绝全零")
+	assert.Equal(t, "01", p1.Flags)
+
+	// 同一轮次重放确定性
+	derived1Repeat := DeriveTraceparentWithUpstream(upstream, accountID, seed, sessionID, turnTime1)
+	assert.Equal(t, derived1, derived1Repeat, "相同上游与相同时间戳派生结果必须幂等一致")
+
+	// 不同轮次时间戳步进演变
+	derived2 := DeriveTraceparentWithUpstream(upstream, accountID, seed, sessionID, turnTime2)
+	p2, ok2 := ParseW3CTraceparent(derived2)
+	require.True(t, ok2)
+	assert.Equal(t, "4bf92f3577b34da6a3ce929d0e0e4736", p2.TraceID, "后续轮次仍然继承上游 trace_id")
+	assert.NotEqual(t, p1.SpanID, p2.SpanID, "不同轮次时间戳必须衍生出不同的子 span_id")
+}
+
+func TestDeriveTraceparentWithUpstream_NaturalEpochTransition(t *testing.T) {
+	accountID := int64(1002)
+	seed := "9f8c6d3e-5b2a-4f1c-8e7d-3a1b5c9e2f4a"
+	sessionID := "sess-epoch-test"
+
+	baseTime := int64(1700000000000)
+	// 在同一个 8 小时 Epoch 窗口内
+	withinEpochTime := baseTime + 1000*60*60 // +1 小时
+	// 确保处于相同 epoch
+	require.Equal(t, baseTime/W3CTraceEpochWindowMs, withinEpochTime/W3CTraceEpochWindowMs)
+
+	tp1 := DeriveTraceparentWithUpstream("", accountID, seed, sessionID, baseTime)
+	p1, ok1 := ParseW3CTraceparent(tp1)
+	require.True(t, ok1)
+	assert.False(t, isAllZeroHex(p1.TraceID))
+	assert.False(t, isAllZeroHex(p1.SpanID))
+
+	tpWithin := DeriveTraceparentWithUpstream("", accountID, seed, sessionID, withinEpochTime)
+	pWithin, okWithin := ParseW3CTraceparent(tpWithin)
+	require.True(t, okWithin)
+	assert.Equal(t, p1.TraceID, pWithin.TraceID, "同一 8 小时自然工时 Epoch 内 trace_id 必须保持稳定自洽")
+	assert.NotEqual(t, p1.SpanID, pWithin.SpanID, "不同时间戳 span_id 必须自然步进")
+
+	// 跨越 8 小时 Epoch
+	acrossEpochTime := baseTime + W3CTraceEpochWindowMs + 1000
+	require.NotEqual(t, baseTime/W3CTraceEpochWindowMs, acrossEpochTime/W3CTraceEpochWindowMs)
+
+	tpAcross := DeriveTraceparentWithUpstream("", accountID, seed, sessionID, acrossEpochTime)
+	pAcross, okAcross := ParseW3CTraceparent(tpAcross)
+	require.True(t, okAcross)
+	assert.NotEqual(t, p1.TraceID, pAcross.TraceID, "跨越 8 小时自然工时后 trace_id 必须发生自然平滑跃迁")
+	assert.False(t, isAllZeroHex(pAcross.TraceID))
+	assert.False(t, isAllZeroHex(pAcross.SpanID))
+}
+
+func TestDeriveTraceparentWithUpstream_MalformedAndZeroFallback(t *testing.T) {
+	accountID := int64(1003)
+	seed := "9f8c6d3e-5b2a-4f1c-8e7d-3a1b5c9e2f4a"
+	sessionID := "sess-malformed-test"
+	now := int64(1700000000000)
+
+	malformedInputs := []string{
+		"",
+		"invalid-format",
+		"00-00000000000000000000000000000000-00f067aa0ba902b7-01", // 全零 trace_id
+		"00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000000-01", // 全零 span_id
+		"ff-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01", // version ff
+	}
+
+	for _, malformed := range malformedInputs {
+		tp := DeriveTraceparentWithUpstream(malformed, accountID, seed, sessionID, now)
+		p, ok := ParseW3CTraceparent(tp)
+		assert.True(t, ok, "畸形或非法上游输入必须安全回退生成合法的 traceparent: %s", malformed)
+		require.NotNil(t, p)
+		assert.False(t, isAllZeroHex(p.TraceID), "回退生成的 trace_id 绝不能全零")
+		assert.False(t, isAllZeroHex(p.SpanID), "回退生成的 span_id 绝不能全零")
+		assert.Equal(t, "00", p.Version)
+		assert.Equal(t, "01", p.Flags)
+	}
+}
+
+func TestResolveCodexFingerprintIDsFromRequest_TraceparentExtraction(t *testing.T) {
+	account := newTestOAuthAccount(5001, map[string]any{
+		codexFingerprintModeExtraKey: "session",
+	})
+	upstream := "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+
+	reqHeaders := http.Header{}
+	reqHeaders.Set("session-id", "test-client-sess")
+	reqHeaders.Set("traceparent", upstream)
+
+	ids := resolveCodexFingerprintIDsFromRequest(account, reqHeaders)
+	require.NotNil(t, ids)
+	assert.Equal(t, upstream, ids.clientTraceparent, "必须成功提取 clientTraceparent")
+
+	p, ok := ParseW3CTraceparent(ids.traceparent)
+	require.True(t, ok)
+	assert.Equal(t, "4bf92f3577b34da6a3ce929d0e0e4736", p.TraceID, "必须继承请求头中的合法上游 trace_id")
+	assert.NotEqual(t, "00f067aa0ba902b7", p.SpanID, "必须演化生成新子 span_id")
+}
+

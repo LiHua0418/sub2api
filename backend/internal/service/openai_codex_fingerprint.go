@@ -275,6 +275,7 @@ type codexFingerprintIDs struct {
 	turnID                        string
 	windowID                      string
 	turnStartedAtUnixMs           int64
+	clientTraceparent             string
 	originalBodySessionID         string
 	originalBodySessionIDCaptured bool
 	userAgent                     string
@@ -295,12 +296,8 @@ type codexFingerprintIDs struct {
 	baggage                       string
 }
 
-// resolveCodexFingerprintIDs 按收敛模式计算出站 ID 集合。
-// clientSessionID 是客户端原始的 session-id 头值（连字符形式），用于 session 模式下
-// 的 thread_id 派生——每个真实 Codex 会话得到一个独立线程。
-// 返回 nil 表示 off 模式，不需要改写。
-// 注意：包含随机生成的 turn_id，调用方必须只调用一次并共享结果给头改写和体改写。
-func resolveCodexFingerprintIDs(account *Account, clientSessionID string, mode codexFingerprintMode) *codexFingerprintIDs {
+// resolveCodexFingerprintIDsWithClientContext 按收敛模式计算出站 ID 集合，同时感知客户端上下文（如上游 W3C Trace Context）。
+func resolveCodexFingerprintIDsWithClientContext(account *Account, clientSessionID, clientTraceparent string, mode codexFingerprintMode) *codexFingerprintIDs {
 	if account == nil || mode == codexFingerprintOff {
 		return nil
 	}
@@ -313,6 +310,7 @@ func resolveCodexFingerprintIDs(account *Account, clientSessionID string, mode c
 		accountID:           account.ID,
 		mode:                mode,
 		turnStartedAtUnixMs: time.Now().UnixMilli(),
+		clientTraceparent:   clientTraceparent,
 	}
 
 	// 采用工业级硬件与环境基因库派生真实美国个人电脑画像 (纯原生终端契约)
@@ -351,8 +349,8 @@ func resolveCodexFingerprintIDs(account *Account, clientSessionID string, mode c
 		}
 		ids.turnID = uuid.Must(uuid.NewV7()).String()
 		ids.windowID = ids.threadID + ":0"
-		// 动态演变链路: 同一会话保持 trace_id 确定自洽，子 span_id 随轮次交互自然步进
-		ids.traceparent = DeriveTraceparent(account.ID, seed, ids.sessionID, ids.turnStartedAtUnixMs)
+		// 动态演变链路: 优先继承上游链路或基于 8 小时自然工时 Epoch 演进
+		ids.traceparent = DeriveTraceparentWithUpstream(clientTraceparent, account.ID, seed, ids.sessionID, ids.turnStartedAtUnixMs)
 		return ids
 
 	case codexFingerprintFull:
@@ -360,11 +358,20 @@ func resolveCodexFingerprintIDs(account *Account, clientSessionID string, mode c
 		ids.threadID = ids.sessionID
 		ids.turnID = uuid.Must(uuid.NewV7()).String()
 		ids.windowID = ids.threadID + ":0"
-		ids.traceparent = DeriveTraceparent(account.ID, seed, ids.sessionID, ids.turnStartedAtUnixMs)
+		ids.traceparent = DeriveTraceparentWithUpstream(clientTraceparent, account.ID, seed, ids.sessionID, ids.turnStartedAtUnixMs)
 		return ids
 	}
 
 	return nil
+}
+
+// resolveCodexFingerprintIDs 按收敛模式计算出站 ID 集合 (保持向后兼容)。
+// clientSessionID 是客户端原始的 session-id 头值（连字符形式），用于 session 模式下
+// 的 thread_id 派生——每个真实 Codex 会话得到一个独立线程。
+// 返回 nil 表示 off 模式，不需要改写。
+// 注意：包含随机生成的 turn_id，调用方必须只调用一次并共享结果给头改写和体改写。
+func resolveCodexFingerprintIDs(account *Account, clientSessionID string, mode codexFingerprintMode) *codexFingerprintIDs {
+	return resolveCodexFingerprintIDsWithClientContext(account, clientSessionID, "", mode)
 }
 
 // extractClientSessionID 从请求头中提取客户端原始的会话标识。
@@ -377,7 +384,21 @@ func extractClientSessionID(h http.Header) string {
 	return strings.TrimSpace(h.Get("session_id"))
 }
 
-// resolveCodexFingerprintIDsFromRequest 从客户端原始请求头中提取 session-id，
+// extractClientTraceparent 从请求头中提取客户端原始的 traceparent 标头 (小写与规范化匹配)。
+func extractClientTraceparent(h http.Header) string {
+	if h == nil {
+		return ""
+	}
+	if v := strings.TrimSpace(h.Get("traceparent")); v != "" {
+		return v
+	}
+	if v := strings.TrimSpace(h.Get("Traceparent")); v != "" {
+		return v
+	}
+	return ""
+}
+
+// resolveCodexFingerprintIDsFromRequest 从客户端原始请求头中提取 session-id 与 traceparent，
 // 结合账号配置一次性解析收敛 ID 集合。调用方应将返回的 ids 同时传给
 // applyCodexFingerprintHeaders 和 applyCodexFingerprintClientMetadata。
 func resolveCodexFingerprintIDsFromRequest(account *Account, clientHeaders http.Header) *codexFingerprintIDs {
@@ -389,10 +410,12 @@ func resolveCodexFingerprintIDsFromRequest(account *Account, clientHeaders http.
 		return nil
 	}
 	clientSessionID := ""
+	clientTraceparent := ""
 	if clientHeaders != nil {
 		clientSessionID = extractClientSessionID(clientHeaders)
+		clientTraceparent = extractClientTraceparent(clientHeaders)
 	}
-	return resolveCodexFingerprintIDs(account, clientSessionID, mode)
+	return resolveCodexFingerprintIDsWithClientContext(account, clientSessionID, clientTraceparent, mode)
 }
 
 // applyCodexFingerprintHeaders 按预计算的收敛 ID 改写出站 HTTP 头中的设备指纹。
