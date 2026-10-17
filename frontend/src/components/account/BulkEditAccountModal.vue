@@ -1664,22 +1664,19 @@ const allOpenAIPassthroughCapable = computed(() => {
   )
 })
 
+// 只要选中的账号中包含 OpenAI OAuth 账号（或全部为 OpenAI OAuth），均展示 WS 模式批量配置
 const allOpenAIOAuth = computed(() => {
   return (
-    targetSelectedPlatforms.value.length === 1 &&
-    targetSelectedPlatforms.value[0] === 'openai' &&
-    targetSelectedTypes.value.length > 0 &&
-    targetSelectedTypes.value.every(t => t === 'oauth' || t === 'setup-token')
+    targetSelectedPlatforms.value.includes('openai') &&
+    (targetSelectedTypes.value.includes('oauth') || targetSelectedTypes.value.includes('setup-token'))
   )
 })
 
-// 严格 OAuth（不含 setup-token）：namespace 摊平兼容开关只对 OAuth 账号生效
+// 严格 OAuth（不含 setup-token）：只要选中的账号中包含 OpenAI OAuth 账号，均展示相关配置项
 const allOpenAIOAuthOnly = computed(() => {
   return (
-    targetSelectedPlatforms.value.length === 1 &&
-    targetSelectedPlatforms.value[0] === 'openai' &&
-    targetSelectedTypes.value.length > 0 &&
-    targetSelectedTypes.value.every(t => t === 'oauth')
+    targetSelectedPlatforms.value.includes('openai') &&
+    targetSelectedTypes.value.includes('oauth')
   )
 })
 
