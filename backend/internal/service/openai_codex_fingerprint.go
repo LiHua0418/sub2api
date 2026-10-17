@@ -406,19 +406,27 @@ func applyCodexFingerprintHeaders(h http.Header, ids *codexFingerprintIDs) {
 	h.Set("x-codex-installation-id", ids.installationID)
 
 	if ids.mode == codexFingerprintDevice {
-		rewriteCodexTurnMetadataFields(h, map[string]any{
-			"installation_id": ids.installationID,
-		})
+		// 仅当原请求携带了 x-codex-turn-metadata 时，才改写其中的 installation_id；
+		// 原请求若未携带，绝不凭空注入一个缺少 session/turn 的残缺头，保持与 Body 的改写逻辑完全镜像一致。
+		if strings.TrimSpace(h.Get("x-codex-turn-metadata")) != "" {
+			rewriteCodexTurnMetadataFields(h, map[string]any{
+				"installation_id": ids.installationID,
+			})
+		}
 		return
 	}
 
 	// session / full 模式：改写所有相关头
 	h.Set("x-codex-window-id", ids.windowID)
 	h.Set("x-client-request-id", ids.threadID)
-	// 连字符形式、下划线形式以及 conversation_id 都统一收敛，保证绝对一致
+	// 连字符形式和下划线形式都改写，保证一致
 	h.Set("session-id", ids.sessionID)
 	h.Set("session_id", ids.sessionID)
-	h.Set("conversation_id", ids.sessionID)
+	// 仅当客户端原本携带了 conversation_id 时才强制收敛为 sessionID，
+	// 避免对纯净官方 CLI 流量凭空捏造 Web 端的非标 conversation_id 头
+	if h.Get("conversation_id") != "" {
+		h.Set("conversation_id", ids.sessionID)
+	}
 	h.Set("thread-id", ids.threadID)
 
 	// 注入真实终端环境指纹 (纯原生终端规范：UA、系统语言、本地时区、W3C APM 遥测，绝对不带 sec-ch-ua 浏览器头)
