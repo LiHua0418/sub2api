@@ -8,6 +8,8 @@ import (
 	"maps"
 	"net/http"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -15,6 +17,240 @@ import (
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 )
+
+// MaxCodexSlots 定义每个账号最大分配的固定工位数 (只点亮不销毁)
+const MaxCodexSlots = 3
+
+// CodexSlotStaticSpec 定义工作区槽位的静态画像规格
+type CodexSlotStaticSpec struct {
+	Index         int
+	SessionID     string
+	WorkspacePath string
+	GitBranch     string
+}
+
+// DeriveAccountSlotSpecs 确定性派生账号对应的固定 3 工位规格
+func DeriveAccountSlotSpecs(accountID int64, seed string) [MaxCodexSlots]CodexSlotStaticSpec {
+	hw := ResolveHardwareProfile(accountID, seed)
+
+	// Windows 系统路径反斜杠兼容判断
+	isWindows := hw.OSName == "Windows" || strings.HasPrefix(hw.WorkspacePath, "C:\\")
+
+	var slot1Path, slot2Path string
+	if isWindows {
+		// 对应 Windows: C:\Users\<Username>\source\repos\service-infra 与 scripts
+		// 保持与 hw.HomeDir 或 hw.WorkspacePath 前缀一致
+		userPrefix := fmt.Sprintf("C:\\Users\\%s\\source\\repos", strings.Title(hw.Username))
+		slot1Path = fmt.Sprintf("%s\\service-infra", userPrefix)
+		slot2Path = fmt.Sprintf("%s\\scripts", userPrefix)
+	} else {
+		// macOS / Linux: /Users/<Username>/Projects/service-infra 与 scripts
+		slot1Path = fmt.Sprintf("/Users/%s/Projects/service-infra", hw.Username)
+		slot2Path = fmt.Sprintf("/Users/%s/Projects/scripts", hw.Username)
+	}
+
+	return [MaxCodexSlots]CodexSlotStaticSpec{
+		{
+			Index:         0,
+			SessionID:     resolveConvergedSessionID(seed),
+			WorkspacePath: hw.WorkspacePath,
+			GitBranch:     "main",
+		},
+		{
+			Index:         1,
+			SessionID:     deriveStableUUIDv4(fmt.Sprintf("sub2api:codex-session-id:v2:%s:slot-2", seed)),
+			WorkspacePath: slot1Path,
+			GitBranch:     "feature/api-v2",
+		},
+		{
+			Index:         2,
+			SessionID:     deriveStableUUIDv4(fmt.Sprintf("sub2api:codex-session-id:v2:%s:slot-3", seed)),
+			WorkspacePath: slot2Path,
+			GitBranch:     "dev",
+		},
+	}
+}
+
+// AccountSlotRuntimeState 账号工作区槽位池运行时状态机
+type AccountSlotRuntimeState struct {
+	mu             sync.RWMutex
+	AccountID      int64
+	Seed           string
+	Specs          [MaxCodexSlots]CodexSlotStaticSpec
+	unlockedCount  int
+	activeInFlight [MaxCodexSlots]int32
+	clientBindings map[string]int
+	bindingAccess  map[string]int64
+}
+
+// SlotLease 槽位租约凭证
+type SlotLease struct {
+	AccountID int64
+	SlotIndex int
+	Spec      CodexSlotStaticSpec
+	state     *AccountSlotRuntimeState
+	released  int32
+}
+
+// Release 释放槽位租约（CAS 防重复释放）
+func (l *SlotLease) Release() {
+	if l == nil || l.state == nil {
+		return
+	}
+	if atomic.CompareAndSwapInt32(&l.released, 0, 1) {
+		l.state.releaseSlot(l.SlotIndex)
+	}
+}
+
+// releaseSlot 原子递减 in-flight 并保证保底不小于 0
+func (s *AccountSlotRuntimeState) releaseSlot(slotIndex int) {
+	if slotIndex < 0 || slotIndex >= MaxCodexSlots {
+		return
+	}
+	for {
+		cur := atomic.LoadInt32(&s.activeInFlight[slotIndex])
+		if cur <= 0 {
+			break
+		}
+		if atomic.CompareAndSwapInt32(&s.activeInFlight[slotIndex], cur, cur-1) {
+			break
+		}
+	}
+}
+
+// AcquireSlot 为请求分配工位槽位
+// 策略：阶段 A 会话亲和 -> 阶段 B 空闲探测优先 Slot 0 -> 阶段 C 动态点亮 1->2->3 只增不减 -> 阶段 D 最小 inFlight 排队
+func (s *AccountSlotRuntimeState) AcquireSlot(clientSessionID string) *SlotLease {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	now := time.Now().Unix()
+	chosenSlot := -1
+
+	// 阶段 A: 会话亲和性优先
+	if clientSessionID != "" {
+		if boundSlot, exists := s.clientBindings[clientSessionID]; exists {
+			if boundSlot >= 0 && boundSlot < s.unlockedCount {
+				chosenSlot = boundSlot
+				s.bindingAccess[clientSessionID] = now
+			}
+		}
+	}
+
+	// 阶段 B: 空闲探测（优先 Slot 0，其次已点亮的其他槽位）
+	if chosenSlot == -1 {
+		for i := 0; i < s.unlockedCount; i++ {
+			if atomic.LoadInt32(&s.activeInFlight[i]) == 0 {
+				chosenSlot = i
+				break
+			}
+		}
+	}
+
+	// 阶段 C: 动态点亮 (若所有已解锁槽位都有活跃请求且 unlockedCount < MaxCodexSlots)
+	if chosenSlot == -1 && s.unlockedCount < MaxCodexSlots {
+		chosenSlot = s.unlockedCount
+		s.unlockedCount++
+	}
+
+	// 阶段 D: 达到最大工位数，在已点亮工位中寻找最小 inFlight 排队
+	if chosenSlot == -1 {
+		minInFlight := int32(1<<31 - 1)
+		bestSlot := 0
+		for i := 0; i < s.unlockedCount; i++ {
+			flight := atomic.LoadInt32(&s.activeInFlight[i])
+			if flight < minInFlight {
+				minInFlight = flight
+				bestSlot = i
+			}
+		}
+		chosenSlot = bestSlot
+	}
+
+	// 绑定并递增 inFlight
+	if clientSessionID != "" {
+		s.clientBindings[clientSessionID] = chosenSlot
+		s.bindingAccess[clientSessionID] = now
+		// 防御内存泄漏：若活跃绑定超过 512，清理 24 小时未活跃的条目
+		if len(s.clientBindings) > 512 {
+			for k, t := range s.bindingAccess {
+				if now-t > 86400 {
+					delete(s.clientBindings, k)
+					delete(s.bindingAccess, k)
+				}
+			}
+		}
+	}
+	atomic.AddInt32(&s.activeInFlight[chosenSlot], 1)
+
+	return &SlotLease{
+		AccountID: s.AccountID,
+		SlotIndex: chosenSlot,
+		Spec:      s.Specs[chosenSlot],
+		state:     s,
+	}
+}
+
+// FixedSlotRegistry 账号槽位池全局注册表
+type FixedSlotRegistry struct {
+	mu     sync.RWMutex
+	states map[int64]*AccountSlotRuntimeState
+}
+
+var (
+	globalSlotRegistry     *FixedSlotRegistry
+	globalSlotRegistryOnce sync.Once
+)
+
+// GetGlobalSlotRegistry 获取全局单例槽位注册表
+func GetGlobalSlotRegistry() *FixedSlotRegistry {
+	globalSlotRegistryOnce.Do(func() {
+		globalSlotRegistry = &FixedSlotRegistry{
+			states: make(map[int64]*AccountSlotRuntimeState),
+		}
+	})
+	return globalSlotRegistry
+}
+
+// ResetGlobalSlotRegistryForTest 重置全局注册表（仅用于单测隔离）
+func ResetGlobalSlotRegistryForTest() {
+	globalSlotRegistryOnce = sync.Once{}
+	globalSlotRegistry = nil
+}
+
+// GetOrCreateAccountState 获取或创建账号对应的槽位运行时状态机
+func (r *FixedSlotRegistry) GetOrCreateAccountState(accountID int64, seed string) *AccountSlotRuntimeState {
+	if accountID <= 0 || strings.TrimSpace(seed) == "" {
+		return nil
+	}
+
+	r.mu.RLock()
+	st, exists := r.states[accountID]
+	if exists && st.Seed == seed {
+		r.mu.RUnlock()
+		return st
+	}
+	r.mu.RUnlock()
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if st, exists = r.states[accountID]; exists && st.Seed == seed {
+		return st
+	}
+
+	specs := DeriveAccountSlotSpecs(accountID, seed)
+	newState := &AccountSlotRuntimeState{
+		AccountID:      accountID,
+		Seed:           seed,
+		Specs:          specs,
+		unlockedCount:  1, // 初始为 1
+		clientBindings: make(map[string]int),
+		bindingAccess:  make(map[string]int64),
+	}
+	r.states[accountID] = newState
+	return newState
+}
 
 // codexFingerprintIDsContextKey 是暂存在 gin context 的收敛 ID 集合键。
 // 由 Forward（非透传）或 forwardOpenAIPassthrough（透传）解析后写入，请求
@@ -269,6 +505,8 @@ func resolveConvergedThreadID(seed, clientSessionID string) string {
 type codexFingerprintIDs struct {
 	accountID                     int64
 	mode                          codexFingerprintMode
+	slotIndex                     int
+	lease                         *SlotLease
 	installationID                string
 	sessionID                     string
 	threadID                      string
@@ -342,7 +580,16 @@ func resolveCodexFingerprintIDsWithClientContext(account *Account, clientSession
 		return ids
 
 	case codexFingerprintSession:
-		ids.sessionID = resolveConvergedSessionID(seed)
+		registry := GetGlobalSlotRegistry()
+		state := registry.GetOrCreateAccountState(account.ID, seed)
+		lease := state.AcquireSlot(clientSessionID)
+
+		ids.slotIndex = lease.SlotIndex
+		ids.lease = lease
+		ids.sessionID = lease.Spec.SessionID
+		ids.workspacePath = lease.Spec.WorkspacePath
+		ids.gitBranch = lease.Spec.GitBranch
+
 		ids.threadID = resolveConvergedThreadID(seed, clientSessionID)
 		if ids.threadID == "" {
 			ids.threadID = ids.sessionID
@@ -354,7 +601,16 @@ func resolveCodexFingerprintIDsWithClientContext(account *Account, clientSession
 		return ids
 
 	case codexFingerprintFull:
-		ids.sessionID = resolveConvergedSessionID(seed)
+		registry := GetGlobalSlotRegistry()
+		state := registry.GetOrCreateAccountState(account.ID, seed)
+		lease := state.AcquireSlot(clientSessionID)
+
+		ids.slotIndex = lease.SlotIndex
+		ids.lease = lease
+		ids.sessionID = lease.Spec.SessionID
+		ids.workspacePath = lease.Spec.WorkspacePath
+		ids.gitBranch = lease.Spec.GitBranch
+
 		ids.threadID = ids.sessionID
 		ids.turnID = uuid.Must(uuid.NewV7()).String()
 		ids.windowID = ids.threadID + ":0"

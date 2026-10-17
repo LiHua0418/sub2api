@@ -1949,8 +1949,14 @@ func (d *openAIWSCaptureDialer) Dial(
 	d.lastHeaders = cloneHeader(headers)
 	d.dialCount++
 	respHeaders := cloneHeader(d.handshake)
+	conn := d.conn
+	if conn != nil {
+		conn.mu.Lock()
+		conn.closed = false
+		conn.mu.Unlock()
+	}
 	d.mu.Unlock()
-	return d.conn, 0, respHeaders, nil
+	return conn, 0, respHeaders, nil
 }
 
 func (d *openAIWSCaptureDialer) DialCount() int {

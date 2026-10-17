@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -213,7 +214,8 @@ func TestApplyCodexFingerprintHeaders_DeviceMode(t *testing.T) {
 // --- applyCodexFingerprintHeaders: session 模式 ---
 
 func TestApplyCodexFingerprintHeaders_SessionMode(t *testing.T) {
-	account := newTestOAuthAccount(1, map[string]any{
+	ResetGlobalSlotRegistryForTest()
+	account := newTestOAuthAccount(101, map[string]any{
 		codexFingerprintModeExtraKey: "session",
 	})
 	clientHeaders := http.Header{}
@@ -257,7 +259,8 @@ func TestApplyCodexFingerprintHeaders_SessionMode(t *testing.T) {
 // --- applyCodexFingerprintHeaders: conversation_id 收敛改写 ---
 
 func TestApplyCodexFingerprintHeaders_ConversationID_Rewritten(t *testing.T) {
-	account := newTestOAuthAccount(1, map[string]any{
+	ResetGlobalSlotRegistryForTest()
+	account := newTestOAuthAccount(102, map[string]any{
 		codexFingerprintModeExtraKey: "session",
 	})
 	seed, ok := codexFingerprintSeed(account.Extra)
@@ -265,6 +268,7 @@ func TestApplyCodexFingerprintHeaders_ConversationID_Rewritten(t *testing.T) {
 	convergedSession := resolveConvergedSessionID(seed)
 
 	t.Run("客户端携带原始 conversation_id 时应被强制收敛为 sessionID", func(t *testing.T) {
+		ResetGlobalSlotRegistryForTest()
 		clientHeaders := http.Header{}
 		clientHeaders.Set("session-id", "client-session-123")
 		ids := resolveCodexFingerprintIDsFromRequest(account, clientHeaders)
@@ -284,6 +288,7 @@ func TestApplyCodexFingerprintHeaders_ConversationID_Rewritten(t *testing.T) {
 	})
 
 	t.Run("客户端未携带 conversation_id 时不凭空捏造该头（保持官方CLI纯净度）", func(t *testing.T) {
+		ResetGlobalSlotRegistryForTest()
 		clientHeaders := http.Header{}
 		clientHeaders.Set("session-id", "client-session-456")
 		ids := resolveCodexFingerprintIDsFromRequest(account, clientHeaders)
@@ -467,7 +472,8 @@ func TestApplyCodexFingerprintHeaders_DeviceMode_DoesNotInjectPartialTurnMetadat
 // --- session 模式：不同客户端得到不同 thread ---
 
 func TestApplyCodexFingerprintHeaders_SessionMode_DifferentClients(t *testing.T) {
-	account := newTestOAuthAccount(1, map[string]any{
+	ResetGlobalSlotRegistryForTest()
+	account := newTestOAuthAccount(103, map[string]any{
 		codexFingerprintModeExtraKey: "session",
 	})
 
@@ -478,6 +484,9 @@ func TestApplyCodexFingerprintHeaders_SessionMode_DifferentClients(t *testing.T)
 	clientA := http.Header{}
 	clientA.Set("session-id", "client-A")
 	idsA := resolveCodexFingerprintIDsFromRequest(account, clientA)
+	if idsA != nil && idsA.lease != nil {
+		idsA.lease.Release()
+	}
 	hA := http.Header{}
 	hA.Set("x-codex-turn-metadata", makeTurnMeta())
 	hA.Set("conversation_id", "client-A-conv")
@@ -486,6 +495,9 @@ func TestApplyCodexFingerprintHeaders_SessionMode_DifferentClients(t *testing.T)
 	clientB := http.Header{}
 	clientB.Set("session-id", "client-B")
 	idsB := resolveCodexFingerprintIDsFromRequest(account, clientB)
+	if idsB != nil && idsB.lease != nil {
+		idsB.lease.Release()
+	}
 	hB := http.Header{}
 	hB.Set("x-codex-turn-metadata", makeTurnMeta())
 	hB.Set("conversation_id", "client-B-conv")
@@ -502,7 +514,8 @@ func TestApplyCodexFingerprintHeaders_SessionMode_DifferentClients(t *testing.T)
 // --- full 模式 ---
 
 func TestApplyCodexFingerprintHeaders_FullMode(t *testing.T) {
-	account := newTestOAuthAccount(1, map[string]any{
+	ResetGlobalSlotRegistryForTest()
+	account := newTestOAuthAccount(104, map[string]any{
 		codexFingerprintModeExtraKey: "full",
 	})
 	seed, ok := codexFingerprintSeed(account.Extra)
@@ -512,6 +525,9 @@ func TestApplyCodexFingerprintHeaders_FullMode(t *testing.T) {
 	clientA := http.Header{}
 	clientA.Set("session-id", "client-A")
 	idsA := resolveCodexFingerprintIDsFromRequest(account, clientA)
+	if idsA != nil && idsA.lease != nil {
+		idsA.lease.Release()
+	}
 	hA := http.Header{}
 	hA.Set("x-codex-turn-metadata", `{"installation_id":"x","session_id":"x","thread_id":"x","turn_id":"x","window_id":"x:0"}`)
 	hA.Set("conversation_id", "client-A-conv")
@@ -520,6 +536,9 @@ func TestApplyCodexFingerprintHeaders_FullMode(t *testing.T) {
 	clientB := http.Header{}
 	clientB.Set("session-id", "client-B")
 	idsB := resolveCodexFingerprintIDsFromRequest(account, clientB)
+	if idsB != nil && idsB.lease != nil {
+		idsB.lease.Release()
+	}
 	hB := http.Header{}
 	hB.Set("x-codex-turn-metadata", `{"installation_id":"x","session_id":"x","thread_id":"x","turn_id":"x","window_id":"x:0"}`)
 	hB.Set("conversation_id", "client-B-conv")
@@ -666,7 +685,8 @@ func TestApplyCodexFingerprintClientMetadata_DeviceMode(t *testing.T) {
 }
 
 func TestApplyCodexFingerprintClientMetadata_SessionMode(t *testing.T) {
-	account := newTestOAuthAccount(1, map[string]any{
+	ResetGlobalSlotRegistryForTest()
+	account := newTestOAuthAccount(105, map[string]any{
 		codexFingerprintModeExtraKey: "session",
 	})
 	clientHeaders := http.Header{}
@@ -710,7 +730,8 @@ func TestApplyCodexFingerprintClientMetadata_SessionMode(t *testing.T) {
 }
 
 func TestApplyCodexFingerprintClientMetadata_FullMode(t *testing.T) {
-	account := newTestOAuthAccount(1, map[string]any{
+	ResetGlobalSlotRegistryForTest()
+	account := newTestOAuthAccount(106, map[string]any{
 		codexFingerprintModeExtraKey: "full",
 	})
 	clientHeaders := http.Header{}
@@ -1328,5 +1349,83 @@ func TestResolveCodexFingerprintIDsFromRequest_TraceparentExtraction(t *testing.
 	cm, _ := bodyMap["client_metadata"].(map[string]any)
 	require.NotNil(t, cm)
 	assert.Equal(t, ids.traceparent, cm["traceparent"], "请求体中的 traceparent 必须与出站 Header 里的 traceparent 100% 镜像一致，杜绝头体撕裂")
+}
+
+func TestFixedSlotRegistry_LifecycleAndSpecs(t *testing.T) {
+	ResetGlobalSlotRegistryForTest()
+	accountID := int64(8888)
+	seed := "22222222-2222-4222-8222-222222222222"
+
+	// 1. 验证 Specs 静态派生
+	specs := DeriveAccountSlotSpecs(accountID, seed)
+	assert.Equal(t, 0, specs[0].Index)
+	assert.Equal(t, resolveConvergedSessionID(seed), specs[0].SessionID)
+	assert.Equal(t, "main", specs[0].GitBranch)
+
+	assert.Equal(t, 1, specs[1].Index)
+	assert.Equal(t, deriveStableUUIDv4(fmt.Sprintf("sub2api:codex-session-id:v2:%s:slot-2", seed)), specs[1].SessionID)
+	assert.True(t, strings.HasSuffix(specs[1].WorkspacePath, "service-infra"))
+	assert.Equal(t, "feature/api-v2", specs[1].GitBranch)
+
+	assert.Equal(t, 2, specs[2].Index)
+	assert.Equal(t, deriveStableUUIDv4(fmt.Sprintf("sub2api:codex-session-id:v2:%s:slot-3", seed)), specs[2].SessionID)
+	assert.True(t, strings.HasSuffix(specs[2].WorkspacePath, "scripts"))
+	assert.Equal(t, "dev", specs[2].GitBranch)
+
+	// 2. 状态机初始为 1
+	registry := GetGlobalSlotRegistry()
+	state := registry.GetOrCreateAccountState(accountID, seed)
+	require.NotNil(t, state)
+	assert.Equal(t, 1, state.unlockedCount)
+
+	// 3. 连续单请求复用 Slot 0
+	l1 := state.AcquireSlot("client-1")
+	assert.Equal(t, 0, l1.SlotIndex)
+	assert.Equal(t, int32(1), state.activeInFlight[0])
+	assert.Equal(t, 1, state.unlockedCount)
+	l1.Release()
+	assert.Equal(t, int32(0), state.activeInFlight[0])
+
+	// 会话亲和复用 Slot 0
+	l1Again := state.AcquireSlot("client-1")
+	assert.Equal(t, 0, l1Again.SlotIndex)
+	l1Again.Release()
+
+	// 4. 并发活跃时自然点亮至 2 和 3
+	hold1 := state.AcquireSlot("client-1")
+	assert.Equal(t, 0, hold1.SlotIndex)
+	assert.Equal(t, 1, state.unlockedCount)
+
+	// client-2 请求时 Slot 0 正处于 in-flight，动态点亮 Slot 1
+	hold2 := state.AcquireSlot("client-2")
+	assert.Equal(t, 1, hold2.SlotIndex)
+	assert.Equal(t, 2, state.unlockedCount)
+
+	// client-3 请求时 Slot 0、1 都处于 in-flight，动态点亮 Slot 2
+	hold3 := state.AcquireSlot("client-3")
+	assert.Equal(t, 2, hold3.SlotIndex)
+	assert.Equal(t, 3, state.unlockedCount)
+
+	// 5. 达到 MaxCodexSlots (3) 封顶，不再点亮新槽位，排队到最小 in-flight 槽位
+	hold4 := state.AcquireSlot("client-4")
+	assert.True(t, hold4.SlotIndex >= 0 && hold4.SlotIndex < MaxCodexSlots)
+	assert.Equal(t, 3, state.unlockedCount) // 封顶不超
+
+	// 6. 安全释放与防重复释放验证
+	assert.Equal(t, int32(1), hold1.released^1) // 尚未释放
+	hold1.Release()
+	assert.Equal(t, int32(1), hold1.released)
+	hold1.Release() // 重复释放不产生负数或多次减计数
+
+	hold2.Release()
+	hold3.Release()
+	hold4.Release()
+
+	for i := 0; i < MaxCodexSlots; i++ {
+		assert.Equal(t, int32(0), state.activeInFlight[i], "全部释放后 in-flight 计数归零")
+	}
+
+	// 7. 只点亮不销毁：即便请求全部完成，unlockedCount 依然保持 3
+	assert.Equal(t, 3, state.unlockedCount)
 }
 

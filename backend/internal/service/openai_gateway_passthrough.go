@@ -212,6 +212,9 @@ func (s *OpenAIGatewayService) forwardOpenAIPassthrough(
 					clientHeaders = c.Request.Header
 				}
 				fpIDs := resolveCodexFingerprintIDsFromRequest(account, clientHeaders)
+				if fpIDs != nil && fpIDs.lease != nil {
+					defer fpIDs.lease.Release()
+				}
 				if fpIDs != nil {
 					fpBody, fpChanged, fpErr := applyCodexFingerprintClientMetadataRaw(body, fpIDs)
 					if fpErr != nil {
